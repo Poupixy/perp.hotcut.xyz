@@ -152,5 +152,96 @@
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
   }
+
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-12px); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.05); }
+}
+
+@keyframes gradient-shift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes orbit {
+  0% { transform: rotate(0deg) translateX(120px) rotate(0deg); }
+  100% { transform: rotate(360deg) translateX(120px) rotate(-360deg); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 4s ease-in-out infinite;
+}
+
+.animate-gradient {
+  background-size: 200% 200%;
+  animation: gradient-shift 8s ease infinite;
+}
+
+.animate-orbit {
+  animation: orbit 20s linear infinite;
+}
+
+.animate-shimmer {
+  background-size: 200% auto;
+  animation: shimmer 3s linear infinite;
+}
+
+.text-gradient {
+  background: linear-gradient(135deg, oklch(0.7 0.18 260), oklch(0.6 0.22 300));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.bg-hero-gradient {
+  background: radial-gradient(ellipse 80% 60% at 50% 20%, oklch(0.15 0.1 260 / 0.4), transparent),
+              radial-gradient(ellipse 60% 50% at 80% 60%, oklch(0.55 0.2 300 / 0.15), transparent),
+              radial-gradient(ellipse 50% 40% at 20% 80%, oklch(0.5 0.15 200 / 0.1), transparent);
+}
+
+.glow-ring {
+  box-shadow: 0 0 40px oklch(0.65 0.2 260 / 0.3), 0 0 80px oklch(0.65 0.2 260 / 0.1);
+}
+
+.glow-text {
+  text-shadow: 0 0 30px oklch(0.65 0.2 260 / 0.5), 0 0 60px oklch(0.65 0.2 260 / 0.2);
+}
+
+.card-glow {
+  box-shadow: 0 0 0 1px oklch(0.65 0.2 260 / 0.1), 0 8px 32px oklch(0 0 0 / 0.3);
+  transition: box-shadow 0.3s ease, transform 0.3s ease;
+}
+
+.card-glow:hover {
+  box-shadow: 0 0 0 1px oklch(0.65 0.2 260 / 0.3), 0 12px 48px oklch(0.65 0.2 260 / 0.15);
+  transform: translateY(-4px);
+}
+
+.grid-pattern {
+  background-image: 
+    linear-gradient(oklch(1 0 0 / 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, oklch(1 0 0 / 0.03) 1px, transparent 1px);
+  background-size: 60px 60px;
 }
