@@ -1,7 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { sales, fmtUSD, fmtTimeAgo } from "@/lib/mock-data";
+import { sales, fmtUSD } from "@/lib/mock-data";
 import { TypeBadge } from "@/components/app/Badges";
+import { RelativeTime } from "@/components/app/RelativeTime";
 
 export const Route = createFileRoute("/_app/sales")({
   component: SalesPage,
