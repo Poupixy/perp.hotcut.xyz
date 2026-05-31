@@ -6,7 +6,7 @@ export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       { title: "Perp RWA — Collectibles Markets Dashboard" },
-      { name: "description", content: "Track NFT, RWA and phygital collectibles markets. Floor prices, volume and recent sales for Pokémon, One Piece, MTG and tokenized assets." },
+      { name: "description", content: "Track NFT and phygital collectibles markets. Floor prices, volume and recent sales for Pokémon, One Piece, NBA, NHL and NFL." },
       { property: "og:title", content: "Perp RWA — Collectibles Markets Dashboard" },
       { property: "og:description", content: "Real-time floor prices and volume for tokenized collectibles." },
     ],
