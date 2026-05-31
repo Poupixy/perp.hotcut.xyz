@@ -135,7 +135,7 @@ function Dashboard() {
                     <span className="text-sm font-medium truncate">{s.asset}</span>
                     <TypeBadge type={s.type} />
                   </div>
-                  <div className="text-xs text-muted-foreground">{s.marketplace} · {fmtTimeAgo(s.time)}</div>
+                  <div className="text-xs text-muted-foreground">{s.marketplace} · <RelativeTime iso={s.time} /></div>
                 </div>
                 <div className="text-sm font-semibold font-mono tabular-nums">{fmtUSD(s.price)}</div>
               </div>
