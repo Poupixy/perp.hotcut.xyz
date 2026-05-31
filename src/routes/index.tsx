@@ -52,8 +52,8 @@ function Landing() {
             <span className="text-gradient-gold">tokenized collectibles</span>.
           </h1>
           <p className="mt-6 text-base sm:text-lg text-muted-foreground max-w-xl leading-relaxed">
-            Track floor prices, volume and sales across NFTs, RWA and phygital
-            collections — Pokémon, One Piece, MTG, tokenized luxury and more —
+            Track floor prices, volume and sales across NFTs and phygital
+            collections — Pokémon, One Piece, NBA, NHL, NFL and more —
             in one professional dashboard.
           </p>
           <div className="mt-10 flex flex-col sm:flex-row gap-3">
