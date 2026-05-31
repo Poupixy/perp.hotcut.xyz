@@ -6,7 +6,7 @@ export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       { title: "Perp RWA — Collectibles Markets Dashboard" },
-      { name: "description", content: "Track NFT, RWA and phygital collectibles markets. Floor prices, volume and recent sales for Pokémon, One Piece, MTG and tokenized assets." },
+      { name: "description", content: "Track NFT and phygital collectibles markets. Floor prices, volume and recent sales for Pokémon, One Piece, NBA, NHL and NFL." },
       { property: "og:title", content: "Perp RWA — Collectibles Markets Dashboard" },
       { property: "og:description", content: "Real-time floor prices and volume for tokenized collectibles." },
     ],
@@ -52,8 +52,8 @@ function Landing() {
             <span className="text-gradient-gold">tokenized collectibles</span>.
           </h1>
           <p className="mt-6 text-base sm:text-lg text-muted-foreground max-w-xl leading-relaxed">
-            Track floor prices, volume and sales across NFTs, RWA and phygital
-            collections — Pokémon, One Piece, MTG, tokenized luxury and more —
+            Track floor prices, volume and sales across NFTs and phygital
+            collections — Pokémon, One Piece, NBA, NHL, NFL and more —
             in one professional dashboard.
           </p>
           <div className="mt-10 flex flex-col sm:flex-row gap-3">
@@ -74,9 +74,9 @@ function Landing() {
           <dl className="mt-16 grid grid-cols-2 sm:grid-cols-4 gap-px bg-border border border-border rounded-lg overflow-hidden">
             {[
               { l: "Tracked collections", v: "8" },
-              { l: "24h volume", v: "$1.33M" },
-              { l: "Marketplaces", v: "6" },
-              { l: "Asset types", v: "NFT · RWA · Phygital" },
+              { l: "24h volume", v: "$591K" },
+              { l: "Marketplaces", v: "4" },
+              { l: "Asset types", v: "NFT · Phygital" },
             ].map((s) => (
               <div key={s.l} className="bg-card p-5">
                 <dt className="text-[11px] uppercase tracking-wider text-muted-foreground">{s.l}</dt>
@@ -126,7 +126,7 @@ function Landing() {
 
       <footer className="mx-auto max-w-7xl px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-muted-foreground">
         <div>© 2026 Perp RWA. Mock data for demo purposes.</div>
-        <div>Built for collectible markets · NFT · RWA · Phygital</div>
+        <div>Built for collectible markets · NFT · Phygital</div>
       </footer>
     </div>
   );

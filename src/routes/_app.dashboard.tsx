@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { collections, sales, fmtUSD, fmtTimeAgo } from "@/lib/mock-data";
+import { collections, sales, fmtUSD } from "@/lib/mock-data";
 import { ChangeBadge, TypeBadge } from "@/components/app/Badges";
+import { RelativeTime } from "@/components/app/RelativeTime";
 import { ArrowUpRight, TrendingUp, DollarSign, Layers, Activity } from "lucide-react";
 
 export const Route = createFileRoute("/_app/dashboard")({
@@ -134,7 +135,7 @@ function Dashboard() {
                     <span className="text-sm font-medium truncate">{s.asset}</span>
                     <TypeBadge type={s.type} />
                   </div>
-                  <div className="text-xs text-muted-foreground">{s.marketplace} · {fmtTimeAgo(s.time)}</div>
+                  <div className="text-xs text-muted-foreground">{s.marketplace} · <RelativeTime iso={s.time} /></div>
                 </div>
                 <div className="text-sm font-semibold font-mono tabular-nums">{fmtUSD(s.price)}</div>
               </div>
