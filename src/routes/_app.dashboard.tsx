@@ -18,7 +18,7 @@ function Dashboard() {
     { label: "Total 24h Volume", value: fmtUSD(totalVolume24h), change: 6.42, icon: DollarSign },
     { label: "Total 7d Volume", value: fmtUSD(totalVolume7d), change: 3.18, icon: TrendingUp },
     { label: "Tracked Collections", value: collections.length.toString(), change: 0, icon: Layers },
-    { label: "Sales (24h)", value: sales.length.toString(), change: 12.4, icon: Activity },
+    { label: "Avg Floor Price", value: fmtUSD(collections.reduce((s, c) => s + c.floorPrice, 0) / collections.length), change: 2.1, icon: BarChart3 },
   ];
 
   return (
