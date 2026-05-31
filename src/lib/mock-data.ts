@@ -164,19 +164,19 @@ export const collections: Collection[] = [
 ];
 
 export const sales: Sale[] = [
-  { id: "s1", collectionSlug: "pokemon-base-set", collectionName: "Pokémon Base Set", asset: "Charizard #4 PSA 10", image: collections[0].image, price: 18420, marketplace: "Courtyard", buyer: "0x8f3a…2c1d", seller: "0x9c4b…7e2a", time: new Date(Date.now() - 1000 * 60 * 2).toISOString(), type: "Phygital" },
-  { id: "s2", collectionSlug: "one-piece-romance-dawn", collectionName: "One Piece RD", asset: "Luffy Leader Alt-Art", image: collections[1].image, price: 1240, marketplace: "Courtyard", buyer: "0x2a1b…8f4c", seller: "0x6d2e…3a91", time: new Date(Date.now() - 1000 * 60 * 6).toISOString(), type: "Phygital" },
-  { id: "s3", collectionSlug: "magic-alpha", asset: "Black Lotus BGS 9", collectionName: "MTG Alpha", image: collections[3].image, price: 142000, marketplace: "Collector Crypt", buyer: "0x4c8a…1d2b", seller: "0x7e1f…9a3c", time: new Date(Date.now() - 1000 * 60 * 14).toISOString(), type: "RWA" },
-  { id: "s4", collectionSlug: "azuki", asset: "Azuki #4821", collectionName: "Azuki", image: collections[5].image, price: 4310, marketplace: "OpenSea", buyer: "0x3a2c…6e9d", seller: "0x1b4f…2a8c", time: new Date(Date.now() - 1000 * 60 * 22).toISOString(), type: "NFT" },
-  { id: "s5", collectionSlug: "pokemon-evolving-skies", asset: "Umbreon VMAX Alt", collectionName: "Evolving Skies", image: collections[2].image, price: 892, marketplace: "TCGFi", buyer: "0x9d2a…4f1b", seller: "0x5c3e…8b2d", time: new Date(Date.now() - 1000 * 60 * 38).toISOString(), type: "Phygital" },
-  { id: "s6", collectionSlug: "rolex-daytona-tokenized", asset: "Daytona 116500LN", collectionName: "Rolex Daytona", image: collections[6].image, price: 39800, marketplace: "Arianee", buyer: "0x7b1a…2d8e", seller: "0x4f9c…1a3b", time: new Date(Date.now() - 1000 * 60 * 52).toISOString(), type: "RWA" },
-  { id: "s7", collectionSlug: "yugioh-lob", asset: "Blue-Eyes White Dragon 1st", collectionName: "Yu-Gi-Oh! LOB", image: collections[4].image, price: 4280, marketplace: "Courtyard", buyer: "0x2e8d…9c4a", seller: "0x6a3b…7f1d", time: new Date(Date.now() - 1000 * 60 * 71).toISOString(), type: "Phygital" },
-  { id: "s8", collectionSlug: "nba-topshot-rare", asset: "LeBron James Dunk", collectionName: "NBA Top Shot", image: collections[7].image, price: 320, marketplace: "Top Shot", buyer: "0x1c4f…3a8b", seller: "0x8d2e…6b1c", time: new Date(Date.now() - 1000 * 60 * 88).toISOString(), type: "NFT" },
-  { id: "s9", collectionSlug: "pokemon-base-set", asset: "Blastoise #2 PSA 9", collectionName: "Pokémon Base Set", image: collections[0].image, price: 6420, marketplace: "Courtyard", buyer: "0x4b8c…2e1a", seller: "0x9f3d…7c2b", time: new Date(Date.now() - 1000 * 60 * 104).toISOString(), type: "Phygital" },
-  { id: "s10", collectionSlug: "azuki", asset: "Azuki #1284", collectionName: "Azuki", image: collections[5].image, price: 4180, marketplace: "OpenSea", buyer: "0x6e2a…8d4c", seller: "0x3b1f…9a2e", time: new Date(Date.now() - 1000 * 60 * 132).toISOString(), type: "NFT" },
+  { id: "s1", collectionSlug: "pokemon-base-set", collectionName: "Pokémon Base Set", asset: "Charizard #4 PSA 10", image: collections[0].image, price: 18420, marketplace: "Courtyard", buyer: "0x8f3a…2c1d", seller: "0x9c4b…7e2a", time: "2026-05-31T10:00:00Z", type: "Phygital" },
+  { id: "s2", collectionSlug: "one-piece-romance-dawn", collectionName: "One Piece RD", asset: "Luffy Leader Alt-Art", image: collections[1].image, price: 1240, marketplace: "Courtyard", buyer: "0x2a1b…8f4c", seller: "0x6d2e…3a91", time: "2026-05-31T09:54:00Z", type: "Phygital" },
+  { id: "s3", collectionSlug: "pokemon-151", asset: "Mewtwo EX Alt", collectionName: "Pokémon 151", image: collections[3].image, price: 340, marketplace: "TCGFi", buyer: "0x4c8a…1d2b", seller: "0x7e1f…9a3c", time: "2026-05-31T09:46:00Z", type: "Phygital" },
+  { id: "s4", collectionSlug: "nba-topshot-rare", asset: "LeBron James Dunk", collectionName: "NBA Top Shot", image: collections[5].image, price: 320, marketplace: "Top Shot", buyer: "0x3a2c…6e9d", seller: "0x1b4f…2a8c", time: "2026-05-31T09:38:00Z", type: "NFT" },
+  { id: "s5", collectionSlug: "pokemon-evolving-skies", asset: "Umbreon VMAX Alt", collectionName: "Evolving Skies", image: collections[2].image, price: 892, marketplace: "TCGFi", buyer: "0x9d2a…4f1b", seller: "0x5c3e…8b2d", time: "2026-05-31T09:22:00Z", type: "Phygital" },
+  { id: "s6", collectionSlug: "nhl-topshot", asset: "Connor McDavid Goal", collectionName: "NHL Top Shot", image: collections[6].image, price: 180, marketplace: "Top Shot", buyer: "0x7b1a…2d8e", seller: "0x4f9c…1a3b", time: "2026-05-31T09:08:00Z", type: "NFT" },
+  { id: "s7", collectionSlug: "nfl-all-day", asset: "Tom Brady Touchdown", collectionName: "NFL All Day", image: collections[7].image, price: 510, marketplace: "All Day", buyer: "0x2e8d…9c4a", seller: "0x6a3b…7f1d", time: "2026-05-31T08:49:00Z", type: "NFT" },
+  { id: "s8", collectionSlug: "pokemon-base-set", asset: "Blastoise #2 PSA 9", collectionName: "Pokémon Base Set", image: collections[0].image, price: 6420, marketplace: "Courtyard", buyer: "0x4b8c…2e1a", seller: "0x9f3d…7c2b", time: "2026-05-31T08:44:00Z", type: "Phygital" },
+  { id: "s9", collectionSlug: "one-piece-paramount-war", asset: "Ace Flame Fist Alt", collectionName: "Paramount War", image: collections[4].image, price: 620, marketplace: "Courtyard", buyer: "0x1c4f…3a8b", seller: "0x8d2e…6b1c", time: "2026-05-31T08:28:00Z", type: "Phygital" },
+  { id: "s10", collectionSlug: "nba-topshot-rare", asset: "Stephen Curry 3-Pointer", collectionName: "NBA Top Shot", image: collections[5].image, price: 280, marketplace: "Top Shot", buyer: "0x6e2a…8d4c", seller: "0x3b1f…9a2e", time: "2026-05-31T08:00:00Z", type: "NFT" },
 ];
 
-export const watchlist = ["pokemon-base-set", "one-piece-romance-dawn", "magic-alpha", "rolex-daytona-tokenized"];
+export const watchlist = ["pokemon-base-set", "one-piece-romance-dawn", "nba-topshot-rare", "nfl-all-day"];
 
 export const fmtUSD = (n: number) =>
   n >= 1_000_000 ? `$${(n / 1_000_000).toFixed(2)}M`
