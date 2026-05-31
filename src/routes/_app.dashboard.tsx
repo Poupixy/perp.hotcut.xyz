@@ -1,8 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { collections, sales, fmtUSD } from "@/lib/mock-data";
+import { collections, fmtUSD } from "@/lib/mock-data";
 import { ChangeBadge, TypeBadge } from "@/components/app/Badges";
-import { RelativeTime } from "@/components/app/RelativeTime";
-import { ArrowUpRight, TrendingUp, DollarSign, Layers, Activity } from "lucide-react";
+import { ArrowUpRight, TrendingUp, DollarSign, Layers, BarChart3 } from "lucide-react";
 
 export const Route = createFileRoute("/_app/dashboard")({
   component: Dashboard,
