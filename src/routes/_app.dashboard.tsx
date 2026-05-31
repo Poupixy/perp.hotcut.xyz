@@ -1,8 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { collections, sales, fmtUSD } from "@/lib/mock-data";
+import { collections, fmtUSD } from "@/lib/mock-data";
 import { ChangeBadge, TypeBadge } from "@/components/app/Badges";
-import { RelativeTime } from "@/components/app/RelativeTime";
-import { ArrowUpRight, TrendingUp, DollarSign, Layers, Activity } from "lucide-react";
+import { ArrowUpRight, TrendingUp, DollarSign, Layers, BarChart3 } from "lucide-react";
 
 export const Route = createFileRoute("/_app/dashboard")({
   component: Dashboard,
@@ -19,7 +18,7 @@ function Dashboard() {
     { label: "Total 24h Volume", value: fmtUSD(totalVolume24h), change: 6.42, icon: DollarSign },
     { label: "Total 7d Volume", value: fmtUSD(totalVolume7d), change: 3.18, icon: TrendingUp },
     { label: "Tracked Collections", value: collections.length.toString(), change: 0, icon: Layers },
-    { label: "Sales (24h)", value: sales.length.toString(), change: 12.4, icon: Activity },
+    { label: "Avg Floor Price", value: fmtUSD(collections.reduce((s, c) => s + c.floorPrice, 0) / collections.length), change: 2.1, icon: BarChart3 },
   ];
 
   return (
@@ -121,24 +120,33 @@ function Dashboard() {
 
         <div className="rounded-lg border border-border bg-card">
           <div className="flex items-center justify-between p-5 border-b border-border">
-            <h2 className="text-sm font-semibold">Recent sales</h2>
-            <Link to="/sales" className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1">
+            <h2 className="text-sm font-semibold">Collection overview</h2>
+            <Link to="/collections" className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1">
               View all <ArrowUpRight className="h-3 w-3" />
             </Link>
           </div>
           <div className="divide-y divide-border">
-            {sales.slice(0, 5).map((s) => (
-              <div key={s.id} className="flex items-center gap-3 p-3.5">
-                <img src={s.image} alt="" className="h-10 w-10 rounded-md object-cover bg-muted" />
+            {collections.map((c) => (
+              <Link
+                key={c.id}
+                to="/collections/$slug"
+                params={{ slug: c.slug }}
+                className="flex items-center gap-3 p-3.5 hover:bg-surface-raised/50 transition"
+              >
+                <img src={c.image} alt="" className="h-10 w-10 rounded-md object-cover bg-muted" />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5">
-                    <span className="text-sm font-medium truncate">{s.asset}</span>
-                    <TypeBadge type={s.type} />
+                    <span className="text-sm font-medium truncate">{c.name}</span>
+                    <TypeBadge type={c.type} />
                   </div>
-                  <div className="text-xs text-muted-foreground">{s.marketplace} · <RelativeTime iso={s.time} /></div>
+                  <div className="text-xs text-muted-foreground font-mono">{c.series} · {fmtUSD(c.floorPrice)} floor</div>
                 </div>
-                <div className="text-sm font-semibold font-mono tabular-nums">{fmtUSD(s.price)}</div>
-              </div>
+                <div className="text-right">
+                  <div className="text-sm font-semibold font-mono tabular-nums">{fmtUSD(c.volume24h)}</div>
+                  <div className="text-[10px] text-muted-foreground">24h vol</div>
+                </div>
+                <ChangeBadge value={c.change24h} />
+              </Link>
             ))}
           </div>
         </div>
