@@ -126,7 +126,7 @@ function Landing() {
 
       <footer className="mx-auto max-w-7xl px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-muted-foreground">
         <div>© 2026 Perp RWA. Mock data for demo purposes.</div>
-        <div>Built for collectible markets · NFT · RWA · Phygital</div>
+        <div>Built for collectible markets · NFT · Phygital</div>
       </footer>
     </div>
   );
