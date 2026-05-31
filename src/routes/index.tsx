@@ -74,9 +74,9 @@ function Landing() {
           <dl className="mt-16 grid grid-cols-2 sm:grid-cols-4 gap-px bg-border border border-border rounded-lg overflow-hidden">
             {[
               { l: "Tracked collections", v: "8" },
-              { l: "24h volume", v: "$1.33M" },
-              { l: "Marketplaces", v: "6" },
-              { l: "Asset types", v: "NFT · RWA · Phygital" },
+              { l: "24h volume", v: "$591K" },
+              { l: "Marketplaces", v: "4" },
+              { l: "Asset types", v: "NFT · Phygital" },
             ].map((s) => (
               <div key={s.l} className="bg-card p-5">
                 <dt className="text-[11px] uppercase tracking-wider text-muted-foreground">{s.l}</dt>
