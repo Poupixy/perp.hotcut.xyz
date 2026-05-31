@@ -116,7 +116,7 @@ function CollectionDetail() {
                   <td className="text-right font-mono tabular-nums font-semibold px-5 py-3">{fmtUSD(s.price)}</td>
                   <td className="px-5 py-3 text-muted-foreground">{s.marketplace}</td>
                   <td className="px-5 py-3 font-mono text-xs text-muted-foreground">{s.buyer}</td>
-                  <td className="text-right px-5 py-3 text-muted-foreground text-xs">{fmtTimeAgo(s.time)}</td>
+                  <td className="text-right px-5 py-3 text-muted-foreground text-xs"><RelativeTime iso={s.time} /></td>
                 </tr>
               ))}
             </tbody>
