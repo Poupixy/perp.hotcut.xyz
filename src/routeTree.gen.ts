@@ -13,6 +13,7 @@ import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
 import { Route as AppCollectionsRouteImport } from './routes/_app.collections'
+import { Route as AppCollectionsSlugRouteImport } from './routes/_app.collections.$slug'
 
 const AppRoute = AppRouteImport.update({
   id: '/_app',
@@ -33,30 +34,44 @@ const AppCollectionsRoute = AppCollectionsRouteImport.update({
   path: '/collections',
   getParentRoute: () => AppRoute,
 } as any)
+const AppCollectionsSlugRoute = AppCollectionsSlugRouteImport.update({
+  id: '/$slug',
+  path: '/$slug',
+  getParentRoute: () => AppCollectionsRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/collections': typeof AppCollectionsRoute
+  '/collections': typeof AppCollectionsRouteWithChildren
   '/dashboard': typeof AppDashboardRoute
+  '/collections/$slug': typeof AppCollectionsSlugRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/collections': typeof AppCollectionsRoute
+  '/collections': typeof AppCollectionsRouteWithChildren
   '/dashboard': typeof AppDashboardRoute
+  '/collections/$slug': typeof AppCollectionsSlugRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_app': typeof AppRouteWithChildren
-  '/_app/collections': typeof AppCollectionsRoute
+  '/_app/collections': typeof AppCollectionsRouteWithChildren
   '/_app/dashboard': typeof AppDashboardRoute
+  '/_app/collections/$slug': typeof AppCollectionsSlugRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/collections' | '/dashboard'
+  fullPaths: '/' | '/collections' | '/dashboard' | '/collections/$slug'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/collections' | '/dashboard'
-  id: '__root__' | '/' | '/_app' | '/_app/collections' | '/_app/dashboard'
+  to: '/' | '/collections' | '/dashboard' | '/collections/$slug'
+  id:
+    | '__root__'
+    | '/'
+    | '/_app'
+    | '/_app/collections'
+    | '/_app/dashboard'
+    | '/_app/collections/$slug'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -94,16 +109,35 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppCollectionsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/collections/$slug': {
+      id: '/_app/collections/$slug'
+      path: '/$slug'
+      fullPath: '/collections/$slug'
+      preLoaderRoute: typeof AppCollectionsSlugRouteImport
+      parentRoute: typeof AppCollectionsRoute
+    }
   }
 }
 
+interface AppCollectionsRouteChildren {
+  AppCollectionsSlugRoute: typeof AppCollectionsSlugRoute
+}
+
+const AppCollectionsRouteChildren: AppCollectionsRouteChildren = {
+  AppCollectionsSlugRoute: AppCollectionsSlugRoute,
+}
+
+const AppCollectionsRouteWithChildren = AppCollectionsRoute._addFileChildren(
+  AppCollectionsRouteChildren,
+)
+
 interface AppRouteChildren {
-  AppCollectionsRoute: typeof AppCollectionsRoute
+  AppCollectionsRoute: typeof AppCollectionsRouteWithChildren
   AppDashboardRoute: typeof AppDashboardRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
-  AppCollectionsRoute: AppCollectionsRoute,
+  AppCollectionsRoute: AppCollectionsRouteWithChildren,
   AppDashboardRoute: AppDashboardRoute,
 }
 
