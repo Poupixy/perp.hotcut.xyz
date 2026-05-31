@@ -76,7 +76,7 @@ function SalesPage() {
                 <td className="px-5 py-3 text-muted-foreground">{s.marketplace}</td>
                 <td className="px-5 py-3 font-mono text-xs text-muted-foreground">{s.buyer}</td>
                 <td className="px-5 py-3 font-mono text-xs text-muted-foreground">{s.seller}</td>
-                <td className="px-5 py-3 text-right text-muted-foreground text-xs">{fmtTimeAgo(s.time)}</td>
+                <td className="px-5 py-3 text-right text-muted-foreground text-xs"><RelativeTime iso={s.time} /></td>
               </tr>
             ))}
           </tbody>
