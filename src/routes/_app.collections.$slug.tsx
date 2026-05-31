@@ -1,6 +1,7 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
-import { collections, sales, fmtUSDFull, fmtUSD, fmtTimeAgo } from "@/lib/mock-data";
+import { collections, sales, fmtUSDFull, fmtUSD } from "@/lib/mock-data";
 import { ChangeBadge, TypeBadge } from "@/components/app/Badges";
+import { RelativeTime } from "@/components/app/RelativeTime";
 import { ArrowLeft, Star, ExternalLink } from "lucide-react";
 
 export const Route = createFileRoute("/_app/collections/$slug")({
