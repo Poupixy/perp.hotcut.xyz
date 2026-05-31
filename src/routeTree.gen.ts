@@ -9,38 +9,117 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AppWatchlistRouteImport } from './routes/_app.watchlist'
+import { Route as AppSalesRouteImport } from './routes/_app.sales'
+import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
+import { Route as AppCollectionsRouteImport } from './routes/_app.collections'
+import { Route as AppCollectionsSlugRouteImport } from './routes/_app.collections.$slug'
 
+const AppRoute = AppRouteImport.update({
+  id: '/_app',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppWatchlistRoute = AppWatchlistRouteImport.update({
+  id: '/watchlist',
+  path: '/watchlist',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSalesRoute = AppSalesRouteImport.update({
+  id: '/sales',
+  path: '/sales',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppDashboardRoute = AppDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppCollectionsRoute = AppCollectionsRouteImport.update({
+  id: '/collections',
+  path: '/collections',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppCollectionsSlugRoute = AppCollectionsSlugRouteImport.update({
+  id: '/$slug',
+  path: '/$slug',
+  getParentRoute: () => AppCollectionsRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/collections': typeof AppCollectionsRouteWithChildren
+  '/dashboard': typeof AppDashboardRoute
+  '/sales': typeof AppSalesRoute
+  '/watchlist': typeof AppWatchlistRoute
+  '/collections/$slug': typeof AppCollectionsSlugRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/collections': typeof AppCollectionsRouteWithChildren
+  '/dashboard': typeof AppDashboardRoute
+  '/sales': typeof AppSalesRoute
+  '/watchlist': typeof AppWatchlistRoute
+  '/collections/$slug': typeof AppCollectionsSlugRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_app': typeof AppRouteWithChildren
+  '/_app/collections': typeof AppCollectionsRouteWithChildren
+  '/_app/dashboard': typeof AppDashboardRoute
+  '/_app/sales': typeof AppSalesRoute
+  '/_app/watchlist': typeof AppWatchlistRoute
+  '/_app/collections/$slug': typeof AppCollectionsSlugRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/collections'
+    | '/dashboard'
+    | '/sales'
+    | '/watchlist'
+    | '/collections/$slug'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/collections'
+    | '/dashboard'
+    | '/sales'
+    | '/watchlist'
+    | '/collections/$slug'
+  id:
+    | '__root__'
+    | '/'
+    | '/_app'
+    | '/_app/collections'
+    | '/_app/dashboard'
+    | '/_app/sales'
+    | '/_app/watchlist'
+    | '/_app/collections/$slug'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AppRoute: typeof AppRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/_app': {
+      id: '/_app'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AppRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -48,22 +127,76 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_app/watchlist': {
+      id: '/_app/watchlist'
+      path: '/watchlist'
+      fullPath: '/watchlist'
+      preLoaderRoute: typeof AppWatchlistRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/sales': {
+      id: '/_app/sales'
+      path: '/sales'
+      fullPath: '/sales'
+      preLoaderRoute: typeof AppSalesRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/dashboard': {
+      id: '/_app/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof AppDashboardRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/collections': {
+      id: '/_app/collections'
+      path: '/collections'
+      fullPath: '/collections'
+      preLoaderRoute: typeof AppCollectionsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/collections/$slug': {
+      id: '/_app/collections/$slug'
+      path: '/$slug'
+      fullPath: '/collections/$slug'
+      preLoaderRoute: typeof AppCollectionsSlugRouteImport
+      parentRoute: typeof AppCollectionsRoute
+    }
   }
 }
 
+interface AppCollectionsRouteChildren {
+  AppCollectionsSlugRoute: typeof AppCollectionsSlugRoute
+}
+
+const AppCollectionsRouteChildren: AppCollectionsRouteChildren = {
+  AppCollectionsSlugRoute: AppCollectionsSlugRoute,
+}
+
+const AppCollectionsRouteWithChildren = AppCollectionsRoute._addFileChildren(
+  AppCollectionsRouteChildren,
+)
+
+interface AppRouteChildren {
+  AppCollectionsRoute: typeof AppCollectionsRouteWithChildren
+  AppDashboardRoute: typeof AppDashboardRoute
+  AppSalesRoute: typeof AppSalesRoute
+  AppWatchlistRoute: typeof AppWatchlistRoute
+}
+
+const AppRouteChildren: AppRouteChildren = {
+  AppCollectionsRoute: AppCollectionsRouteWithChildren,
+  AppDashboardRoute: AppDashboardRoute,
+  AppSalesRoute: AppSalesRoute,
+  AppWatchlistRoute: AppWatchlistRoute,
+}
+
+const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AppRoute: AppRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

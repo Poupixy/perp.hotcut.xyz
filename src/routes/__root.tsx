@@ -72,14 +72,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Genesis — AI-Powered World Generation" },
-      { name: "description", content: "Create immersive 3D worlds from text descriptions with AI. Generate cities, landscapes, and entire environments in seconds." },
-      { name: "author", content: "Genesis" },
-      { property: "og:title", content: "Genesis — AI-Powered World Generation" },
-      { property: "og:description", content: "Create immersive 3D worlds from text descriptions with AI." },
+      { title: "Perp RWA — Collectibles Markets Dashboard" },
+      { name: "description", content: "Track NFT, RWA and phygital collectibles markets in one professional dashboard." },
+      { name: "author", content: "Perp RWA" },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:site", content: "@genesisai" },
     ],
     links: [
       {
