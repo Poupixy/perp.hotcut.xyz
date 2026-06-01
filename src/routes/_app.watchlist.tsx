@@ -16,7 +16,7 @@ function WatchlistPage() {
       <div className="flex items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Watchlist</h1>
-          <p className="text-sm text-muted-foreground mt-1">Collections you're tracking closely.</p>
+          <p className="text-sm text-muted-foreground mt-1">Collections selected for closer market-intelligence monitoring.</p>
         </div>
         <div className="text-xs text-muted-foreground font-mono">{watched.length} watched</div>
       </div>
@@ -47,15 +47,15 @@ function WatchlistPage() {
                 </button>
               </div>
               <div className="p-4">
-                <div className="text-xs text-muted-foreground">{c.series}</div>
+                <div className="text-xs text-muted-foreground">{c.category} · {c.series}</div>
                 <div className="mt-0.5 font-semibold truncate group-hover:text-primary transition">{c.name}</div>
                 <div className="mt-4 flex items-end justify-between">
                   <div>
-                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Floor</div>
+                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Ref floor</div>
                     <div className="font-mono tabular-nums font-semibold">{fmtUSD(c.floorPrice)}</div>
                   </div>
                   <div className="text-right">
-                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground">24h Vol</div>
+                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground">24h verified</div>
                     <div className="font-mono tabular-nums text-muted-foreground">{fmtUSD(c.volume24h)}</div>
                   </div>
                   <ChangeBadge value={c.change24h} />

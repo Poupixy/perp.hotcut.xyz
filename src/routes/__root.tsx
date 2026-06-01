@@ -72,8 +72,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Perp RWA — Collectibles Markets Dashboard" },
-      { name: "description", content: "Track NFT, RWA and phygital collectibles markets in one professional dashboard." },
+      { title: "Perp RWA — Tokenized Collectibles Market Intelligence" },
+      { name: "description", content: "Track verified sales, pricing trends, and liquidity across tokenized collectibles and phygital assets." },
       { name: "author", content: "Perp RWA" },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },

@@ -1,19 +1,23 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowRight, Sparkles, TrendingUp, Layers, ShieldCheck, Activity } from "lucide-react";
+import { categories, collections, fmtUSD, sales } from "@/lib/mock-data";
 
 export const Route = createFileRoute("/")({
   component: Landing,
   head: () => ({
     meta: [
-      { title: "Perp RWA — Collectibles Markets Dashboard" },
-      { name: "description", content: "Track NFT and phygital collectibles markets. Floor prices, volume and recent sales for Pokémon, One Piece, NBA, NHL and NFL." },
-      { property: "og:title", content: "Perp RWA — Collectibles Markets Dashboard" },
-      { property: "og:description", content: "Real-time floor prices and volume for tokenized collectibles." },
+      { title: "Perp RWA — Tokenized Collectibles Market Intelligence" },
+      { name: "description", content: "Market intelligence for tokenized collectibles, verified sales, pricing trends, and liquidity across trading cards, sports memorabilia, and phygital assets." },
+      { property: "og:title", content: "Perp RWA — Tokenized Collectibles Market Intelligence" },
+      { property: "og:description", content: "Track verified sales, pricing trends, and liquidity across tokenized collectibles." },
     ],
   }),
 });
 
 function Landing() {
+  const totalVolume24h = categories.reduce((sum, category) => sum + category.volume24h, 0);
+  const trackedAssets = categories.reduce((sum, category) => sum + category.assets, 0);
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <header className="sticky top-0 z-40 border-b border-border/60 bg-background/70 backdrop-blur-xl">
@@ -26,15 +30,15 @@ function Landing() {
             <span className="ml-2 text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-surface text-muted-foreground border border-border">V1</span>
           </div>
           <nav className="hidden md:flex items-center gap-7 text-sm text-muted-foreground">
-            <a href="#markets" className="hover:text-foreground transition">Markets</a>
-            <a href="#features" className="hover:text-foreground transition">Features</a>
-            <a href="#coverage" className="hover:text-foreground transition">Coverage</a>
+            <a href="#categories" className="hover:text-foreground transition">Categories</a>
+            <a href="#intelligence" className="hover:text-foreground transition">Intelligence</a>
+            <a href="#sales" className="hover:text-foreground transition">Sales</a>
           </nav>
           <Link
             to="/dashboard"
             className="inline-flex items-center gap-1.5 h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition"
           >
-            Open Dashboard <ArrowRight className="h-3.5 w-3.5" />
+            Open Intelligence <ArrowRight className="h-3.5 w-3.5" />
           </Link>
         </div>
       </header>
@@ -45,23 +49,23 @@ function Landing() {
         <div className="relative mx-auto max-w-7xl px-6 py-24 sm:py-32">
           <div className="inline-flex items-center gap-2 rounded-full border border-border bg-surface/70 px-3 py-1 text-xs text-muted-foreground mb-6">
             <span className="h-1.5 w-1.5 rounded-full bg-success animate-pulse" />
-            Live across 8 collections · mock data preview
+            Prototype data · category-first market structure
           </div>
           <h1 className="text-4xl sm:text-6xl font-semibold tracking-tight max-w-3xl leading-[1.05]">
-            The market layer for{" "}
+            Market intelligence for{" "}
             <span className="text-gradient-gold">tokenized collectibles</span>.
           </h1>
           <p className="mt-6 text-base sm:text-lg text-muted-foreground max-w-xl leading-relaxed">
-            Track floor prices, volume and sales across NFTs and phygital
-            collections — Pokémon, One Piece, NBA, NHL, NFL and more —
-            in one professional dashboard.
+            A market intelligence platform for tokenized collectibles, tracking
+            verified sales, pricing trends, and liquidity across trading cards,
+            sports memorabilia, and phygital assets.
           </p>
           <div className="mt-10 flex flex-col sm:flex-row gap-3">
             <Link
               to="/dashboard"
               className="inline-flex items-center justify-center gap-2 h-11 px-6 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition"
             >
-              Open Dashboard <ArrowRight className="h-4 w-4" />
+              Open Intelligence <ArrowRight className="h-4 w-4" />
             </Link>
             <Link
               to="/collections"
@@ -73,10 +77,10 @@ function Landing() {
 
           <dl className="mt-16 grid grid-cols-2 sm:grid-cols-4 gap-px bg-border border border-border rounded-lg overflow-hidden">
             {[
-              { l: "Tracked collections", v: "8" },
-              { l: "24h volume", v: "$591K" },
-              { l: "Marketplaces", v: "4" },
-              { l: "Asset types", v: "NFT · Phygital" },
+              { l: "Market categories", v: categories.length.toString() },
+              { l: "Tracked assets", v: trackedAssets.toLocaleString() },
+              { l: "24h verified volume", v: fmtUSD(totalVolume24h) },
+              { l: "Collections", v: collections.length.toString() },
             ].map((s) => (
               <div key={s.l} className="bg-card p-5">
                 <dt className="text-[11px] uppercase tracking-wider text-muted-foreground">{s.l}</dt>
@@ -87,19 +91,54 @@ function Landing() {
         </div>
       </section>
 
-      <section id="features" className="border-b border-border">
+      <section id="categories" className="border-b border-border">
         <div className="mx-auto max-w-7xl px-6 py-24">
-          <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight">Built for serious market watchers</h2>
-          <p className="mt-3 text-muted-foreground max-w-xl">Institutional-grade visibility across emerging collectibles markets — no noise, no gimmicks.</p>
+          <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight">Category-first market coverage</h2>
+          <p className="mt-3 text-muted-foreground max-w-xl">Perp RWA organizes collectibles by market category first, then collections, individual assets, and verified sales.</p>
 
           <div className="mt-12 grid md:grid-cols-3 gap-px bg-border border border-border rounded-lg overflow-hidden">
+            {categories.slice(0, 5).map((category) => (
+              <div key={category.name} className="bg-card p-6">
+                <Layers className="h-4 w-4 text-primary" />
+                <h3 className="mt-3 text-sm font-semibold">{category.name}</h3>
+                <dl className="mt-4 grid grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <dt className="text-muted-foreground">Collections</dt>
+                    <dd className="mt-1 font-mono font-semibold">{category.collections}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted-foreground">Assets</dt>
+                    <dd className="mt-1 font-mono font-semibold">{category.assets.toLocaleString()}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted-foreground">24h volume</dt>
+                    <dd className="mt-1 font-mono font-semibold">{fmtUSD(category.volume24h)}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted-foreground">24h trend</dt>
+                    <dd className="mt-1 font-mono font-semibold">{category.change24h > 0 ? "+" : ""}{category.change24h.toFixed(1)}%</dd>
+                  </div>
+                </dl>
+              </div>
+            ))}
+            <div className="bg-card p-6">
+              <ShieldCheck className="h-4 w-4 text-primary" />
+              <h3 className="mt-3 text-sm font-semibold">Verified sales layer</h3>
+              <p className="mt-1.5 text-sm text-muted-foreground leading-relaxed">Sales rows connect asset image, asset name, category, collection, grade, sale price, source, sale time, and price change.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="intelligence" className="border-b border-border">
+        <div className="mx-auto max-w-7xl px-6 py-24">
+          <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight">Built for market intelligence, not trading execution</h2>
+          <p className="mt-3 text-muted-foreground max-w-xl">This prototype keeps the scope clear: research, pricing context, liquidity monitoring, and collection-level discovery.</p>
+          <div className="mt-12 grid md:grid-cols-3 gap-px bg-border border border-border rounded-lg overflow-hidden">
             {[
-              { i: TrendingUp, t: "Floor & volume tracking", d: "24h and 7d floor, volume and change for every tracked collection." },
-              { i: Layers, t: "Unified asset types", d: "NFT, RWA and phygital collectibles in one consistent schema." },
-              { i: Activity, t: "Live sales feed", d: "Recent sales across Courtyard, Collector Crypt, OpenSea and more." },
-              { i: ShieldCheck, t: "RWA verification", d: "Clear flags for physically-backed and tokenized real-world assets." },
-              { i: Sparkles, t: "Watchlist", d: "Pin the collections you care about and surface them at the top." },
-              { i: ArrowRight, t: "API-ready (soon)", d: "Same schema you see in the UI will be exposed via a public API." },
+              { i: TrendingUp, t: "Pricing trends", d: "Monitor floor movement, volume, and sale-price changes across priority categories." },
+              { i: Activity, t: "Verified sales context", d: "Compare asset-level transactions by collection, grade, marketplace, and sale time." },
+              { i: Sparkles, t: "Research workflow", d: "Use watchlists and collection pages to focus on assets worth deeper analysis." },
             ].map((f) => (
               <div key={f.t} className="bg-card p-6">
                 <f.i className="h-4 w-4 text-primary" />
@@ -111,22 +150,56 @@ function Landing() {
         </div>
       </section>
 
-      <section id="coverage" className="border-b border-border bg-surface/40">
-        <div className="mx-auto max-w-7xl px-6 py-24 text-center">
-          <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight">Ready to explore the markets?</h2>
-          <p className="mt-3 text-muted-foreground max-w-xl mx-auto">Open the dashboard to see live floor prices, volume trends and recent sales.</p>
+      <section id="sales" className="border-b border-border bg-surface/40">
+        <div className="mx-auto max-w-7xl px-6 py-24">
+          <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+            <div>
+              <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight">Recent verified sales</h2>
+              <p className="mt-3 text-muted-foreground max-w-xl">Mock sales data shows the target hierarchy from category to collection to asset-level transaction.</p>
+            </div>
+            <Link
+              to="/sales"
+              className="inline-flex items-center justify-center gap-2 h-10 px-4 rounded-md border border-border bg-surface text-sm font-medium hover:bg-surface-raised transition"
+            >
+              View sales <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+          <div className="mt-8 rounded-lg border border-border bg-card overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border">
+                  <th className="text-left font-medium px-5 py-3">Asset</th>
+                  <th className="text-left font-medium px-5 py-3">Category</th>
+                  <th className="text-left font-medium px-5 py-3">Collection</th>
+                  <th className="text-left font-medium px-5 py-3">Grade</th>
+                  <th className="text-right font-medium px-5 py-3">Sale price</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {sales.slice(0, 4).map((sale) => (
+                  <tr key={sale.id}>
+                    <td className="px-5 py-3 font-medium">{sale.asset}</td>
+                    <td className="px-5 py-3 text-muted-foreground">{sale.category}</td>
+                    <td className="px-5 py-3 text-muted-foreground">{sale.collectionName}</td>
+                    <td className="px-5 py-3 text-muted-foreground">{sale.grade}</td>
+                    <td className="px-5 py-3 text-right font-mono font-semibold">{fmtUSD(sale.price)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
           <Link
             to="/dashboard"
             className="mt-8 inline-flex items-center gap-2 h-11 px-6 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition"
           >
-            Open Dashboard <ArrowRight className="h-4 w-4" />
+            Open Intelligence <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
       </section>
 
       <footer className="mx-auto max-w-7xl px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-muted-foreground">
-        <div>© 2026 Perp RWA. Mock data for demo purposes.</div>
-        <div>Built for collectible markets · NFT · Phygital</div>
+        <div>© 2026 Perp RWA. Prototype data for market-intelligence workflows.</div>
+        <div>Tokenized collectibles · Trading cards · Phygital assets</div>
       </footer>
     </div>
   );

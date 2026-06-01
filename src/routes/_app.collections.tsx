@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { collections, fmtUSD } from "@/lib/mock-data";
+import { categories, collections, fmtUSD } from "@/lib/mock-data";
 import { ChangeBadge, TypeBadge } from "@/components/app/Badges";
 import { ArrowUpDown } from "lucide-react";
 
@@ -19,7 +19,25 @@ function CollectionsPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Collections</h1>
-        <p className="text-sm text-muted-foreground mt-1">All tracked collectibles markets with live floor and volume data.</p>
+        <p className="text-sm text-muted-foreground mt-1">Collections grouped under market categories, with mock liquidity and pricing signals.</p>
+      </div>
+
+      <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-3">
+        {categories.map((category) => (
+          <div key={category.name} className="rounded-lg border border-border bg-card p-4">
+            <div className="text-sm font-semibold">{category.name}</div>
+            <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+              <div>
+                <div className="text-muted-foreground">Assets</div>
+                <div className="mt-0.5 font-mono">{category.assets.toLocaleString()}</div>
+              </div>
+              <div>
+                <div className="text-muted-foreground">24h Vol</div>
+                <div className="mt-0.5 font-mono">{fmtUSD(category.volume24h)}</div>
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
 
       <div className="flex items-center justify-between gap-3">
@@ -43,7 +61,9 @@ function CollectionsPage() {
             <tr className="text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border">
               <th className="text-left font-medium px-5 py-3 w-10">#</th>
               <th className="text-left font-medium px-5 py-3">Collection</th>
+              <th className="text-left font-medium px-5 py-3">Category</th>
               <th className="text-left font-medium px-5 py-3">Type</th>
+              <th className="text-right font-medium px-5 py-3">Assets</th>
               <th className="text-right font-medium px-5 py-3">
                 <button className="inline-flex items-center gap-1 hover:text-foreground">Floor <ArrowUpDown className="h-3 w-3" /></button>
               </th>
@@ -67,7 +87,9 @@ function CollectionsPage() {
                     </div>
                   </Link>
                 </td>
+                <td className="px-5 py-3.5 text-muted-foreground">{c.category}</td>
                 <td className="px-5 py-3.5"><TypeBadge type={c.type} /></td>
+                <td className="px-5 py-3.5 text-right font-mono tabular-nums text-muted-foreground">{c.trackedAssets.toLocaleString()}</td>
                 <td className="px-5 py-3.5 text-right font-mono tabular-nums">{fmtUSD(c.floorPrice)}</td>
                 <td className="px-5 py-3.5 text-right"><ChangeBadge value={c.change24h} /></td>
                 <td className="px-5 py-3.5 text-right"><ChangeBadge value={c.change7d} /></td>

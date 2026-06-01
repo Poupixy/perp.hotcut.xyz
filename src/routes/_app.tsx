@@ -19,7 +19,7 @@ function AppLayout() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
               <input
                 type="search"
-                placeholder="Search collections, assets…"
+                placeholder="Search categories, collections, assets..."
                 className="w-full h-9 rounded-md border border-border bg-surface pl-9 pr-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
               />
             </div>
@@ -29,8 +29,8 @@ function AppLayout() {
               </button>
               <div className="h-9 px-3 inline-flex items-center gap-2 rounded-md border border-border bg-surface text-xs">
                 <span className="h-1.5 w-1.5 rounded-full bg-success" />
-                <span className="text-muted-foreground">Markets</span>
-                <span className="font-mono tabular-nums">Open</span>
+                <span className="text-muted-foreground">Data mode</span>
+                <span className="font-mono tabular-nums">Mock</span>
               </div>
             </div>
           </header>

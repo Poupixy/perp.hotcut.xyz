@@ -1,31 +1,31 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { collections, fmtUSD } from "@/lib/mock-data";
+import { categories, collections, fmtUSD, sales } from "@/lib/mock-data";
 import { ChangeBadge, TypeBadge } from "@/components/app/Badges";
 import { ArrowUpRight, TrendingUp, DollarSign, Layers, BarChart3 } from "lucide-react";
 
 export const Route = createFileRoute("/_app/dashboard")({
   component: Dashboard,
-  head: () => ({ meta: [{ title: "Dashboard — Perp RWA" }] }),
+  head: () => ({ meta: [{ title: "Market Overview — Perp RWA" }] }),
 });
 
 function Dashboard() {
   const totalVolume24h = collections.reduce((s, c) => s + c.volume24h, 0);
   const totalVolume7d = collections.reduce((s, c) => s + c.volume7d, 0);
-  const topGainers = [...collections].sort((a, b) => b.change24h - a.change24h).slice(0, 4);
+  const topCategories = [...categories].sort((a, b) => b.volume24h - a.volume24h).slice(0, 4);
   const topVolume = [...collections].sort((a, b) => b.volume24h - a.volume24h).slice(0, 5);
 
   const stats = [
-    { label: "Total 24h Volume", value: fmtUSD(totalVolume24h), change: 6.42, icon: DollarSign },
-    { label: "Total 7d Volume", value: fmtUSD(totalVolume7d), change: 3.18, icon: TrendingUp },
-    { label: "Tracked Collections", value: collections.length.toString(), change: 0, icon: Layers },
-    { label: "Avg Floor Price", value: fmtUSD(collections.reduce((s, c) => s + c.floorPrice, 0) / collections.length), change: 2.1, icon: BarChart3 },
+    { label: "Verified 24h Volume", value: fmtUSD(totalVolume24h), change: 6.42, icon: DollarSign },
+    { label: "Verified 7d Volume", value: fmtUSD(totalVolume7d), change: 3.18, icon: TrendingUp },
+    { label: "Market Categories", value: categories.length.toString(), change: 0, icon: Layers },
+    { label: "Tracked Assets", value: collections.reduce((s, c) => s + c.trackedAssets, 0).toLocaleString(), change: 2.1, icon: BarChart3 },
   ];
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-        <p className="text-sm text-muted-foreground mt-1">Market overview across all tracked collectibles.</p>
+        <h1 className="text-2xl font-semibold tracking-tight">Market Overview</h1>
+        <p className="text-sm text-muted-foreground mt-1">Category, collection, asset, and verified-sales intelligence for tokenized collectibles.</p>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -47,8 +47,8 @@ function Dashboard() {
         <div className="lg:col-span-2 rounded-lg border border-border bg-card">
           <div className="flex items-center justify-between p-5 border-b border-border">
             <div>
-              <h2 className="text-sm font-semibold">Volume — last 7 days</h2>
-              <p className="text-xs text-muted-foreground mt-0.5">Aggregated across tracked collections</p>
+              <h2 className="text-sm font-semibold">Verified sales volume — last 7 days</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">Mock trend aggregated across tracked categories</p>
             </div>
             <div className="flex gap-1">
               {["24h", "7d", "30d"].map((p, i) => (
@@ -61,32 +61,32 @@ function Dashboard() {
 
         <div className="rounded-lg border border-border bg-card">
           <div className="p-5 border-b border-border">
-            <h2 className="text-sm font-semibold">Top gainers (24h)</h2>
+            <h2 className="text-sm font-semibold">Top categories by 24h volume</h2>
           </div>
           <div className="divide-y divide-border">
-            {topGainers.map((c) => (
-              <Link
-                key={c.id}
-                to="/collections/$slug"
-                params={{ slug: c.slug }}
-                className="flex items-center gap-3 p-3.5 hover:bg-surface-raised/50 transition"
-              >
-                <img src={c.image} alt="" className="h-10 w-10 rounded-md object-cover bg-muted" />
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium truncate">{c.name}</div>
-                  <div className="text-xs text-muted-foreground font-mono">{fmtUSD(c.floorPrice)}</div>
+            {topCategories.map((category) => (
+              <div key={category.name} className="flex items-center gap-3 p-3.5">
+                <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary/10 ring-1 ring-primary/20">
+                  <Layers className="h-4 w-4 text-primary" />
                 </div>
-                <ChangeBadge value={c.change24h} />
-              </Link>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium truncate">{category.name}</div>
+                  <div className="text-xs text-muted-foreground font-mono">{category.assets.toLocaleString()} tracked assets</div>
+                </div>
+                <div className="text-right">
+                  <div className="text-sm font-semibold font-mono">{fmtUSD(category.volume24h)}</div>
+                  <ChangeBadge value={category.change24h} />
+                </div>
+              </div>
             ))}
           </div>
         </div>
       </div>
 
       <div className="grid lg:grid-cols-2 gap-4">
-        <div className="rounded-lg border border-border bg-card">
+        <div className="rounded-lg border border-border bg-card overflow-hidden">
           <div className="flex items-center justify-between p-5 border-b border-border">
-            <h2 className="text-sm font-semibold">Top volume</h2>
+            <h2 className="text-sm font-semibold">Top collections by liquidity</h2>
             <Link to="/collections" className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1">
               View all <ArrowUpRight className="h-3 w-3" />
             </Link>
@@ -95,6 +95,7 @@ function Dashboard() {
             <thead>
               <tr className="text-[11px] uppercase tracking-wider text-muted-foreground">
                 <th className="text-left font-medium px-5 py-2">Collection</th>
+                <th className="text-left font-medium px-5 py-2">Category</th>
                 <th className="text-right font-medium px-5 py-2">Floor</th>
                 <th className="text-right font-medium px-5 py-2">24h Vol</th>
                 <th className="text-right font-medium px-5 py-2">24h</th>
@@ -109,6 +110,7 @@ function Dashboard() {
                       <span className="font-medium truncate max-w-[180px]">{c.name}</span>
                     </Link>
                   </td>
+                  <td className="px-5 py-3 text-muted-foreground">{c.category}</td>
                   <td className="text-right font-mono tabular-nums px-5 py-3">{fmtUSD(c.floorPrice)}</td>
                   <td className="text-right font-mono tabular-nums px-5 py-3">{fmtUSD(c.volume24h)}</td>
                   <td className="text-right px-5 py-3"><ChangeBadge value={c.change24h} /></td>
@@ -120,32 +122,32 @@ function Dashboard() {
 
         <div className="rounded-lg border border-border bg-card">
           <div className="flex items-center justify-between p-5 border-b border-border">
-            <h2 className="text-sm font-semibold">Collection overview</h2>
-            <Link to="/collections" className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1">
+            <h2 className="text-sm font-semibold">Latest verified sales</h2>
+            <Link to="/sales" className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1">
               View all <ArrowUpRight className="h-3 w-3" />
             </Link>
           </div>
           <div className="divide-y divide-border">
-            {collections.map((c) => (
+            {sales.slice(0, 6).map((sale) => (
               <Link
-                key={c.id}
+                key={sale.id}
                 to="/collections/$slug"
-                params={{ slug: c.slug }}
+                params={{ slug: sale.collectionSlug }}
                 className="flex items-center gap-3 p-3.5 hover:bg-surface-raised/50 transition"
               >
-                <img src={c.image} alt="" className="h-10 w-10 rounded-md object-cover bg-muted" />
+                <img src={sale.image} alt="" className="h-10 w-10 rounded-md object-cover bg-muted" />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5">
-                    <span className="text-sm font-medium truncate">{c.name}</span>
-                    <TypeBadge type={c.type} />
+                    <span className="text-sm font-medium truncate">{sale.asset}</span>
+                    <TypeBadge type={sale.type} />
                   </div>
-                  <div className="text-xs text-muted-foreground font-mono">{c.series} · {fmtUSD(c.floorPrice)} floor</div>
+                  <div className="text-xs text-muted-foreground">{sale.category} · {sale.collectionName} · {sale.grade}</div>
                 </div>
                 <div className="text-right">
-                  <div className="text-sm font-semibold font-mono tabular-nums">{fmtUSD(c.volume24h)}</div>
-                  <div className="text-[10px] text-muted-foreground">24h vol</div>
+                  <div className="text-sm font-semibold font-mono tabular-nums">{fmtUSD(sale.price)}</div>
+                  <div className="text-[10px] text-muted-foreground">{sale.marketplace}</div>
                 </div>
-                <ChangeBadge value={c.change24h} />
+                <ChangeBadge value={sale.priceChange} />
               </Link>
             ))}
           </div>
@@ -156,7 +158,6 @@ function Dashboard() {
 }
 
 function ChartPlaceholder() {
-  // SVG sparkline placeholder
   const points = [22, 28, 24, 32, 38, 34, 42, 39, 48, 52, 47, 58, 62, 56, 68, 72, 64, 78, 82, 76, 88];
   const max = Math.max(...points);
   const min = Math.min(...points);

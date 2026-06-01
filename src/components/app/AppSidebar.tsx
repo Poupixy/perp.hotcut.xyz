@@ -14,9 +14,9 @@ import {
 } from "@/components/ui/sidebar";
 
 const nav = [
-  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
+  { title: "Market Overview", url: "/dashboard", icon: LayoutDashboard },
   { title: "Collections", url: "/collections", icon: Layers },
-  { title: "Recent Sales", url: "/sales", icon: Activity },
+  { title: "Verified Sales", url: "/sales", icon: Activity },
   { title: "Watchlist", url: "/watchlist", icon: Star },
 ];
 
@@ -33,14 +33,14 @@ export function AppSidebar() {
           </div>
           <div className="flex flex-col leading-tight group-data-[collapsible=icon]:hidden">
             <span className="text-sm font-semibold tracking-tight">Perp RWA</span>
-            <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Collectibles Markets</span>
+            <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Market Intelligence</span>
           </div>
         </Link>
       </SidebarHeader>
 
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Markets</SidebarGroupLabel>
+          <SidebarGroupLabel>Intelligence</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {nav.map((item) => (
@@ -62,7 +62,7 @@ export function AppSidebar() {
         <div className="px-2 py-2 text-[10px] text-muted-foreground group-data-[collapsible=icon]:hidden">
           <div className="flex items-center gap-1.5">
             <span className="h-1.5 w-1.5 rounded-full bg-success animate-pulse" />
-            Mock data · v0.1
+            Prototype data · v0.1
           </div>
         </div>
       </SidebarFooter>

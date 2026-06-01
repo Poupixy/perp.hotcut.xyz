@@ -27,11 +27,11 @@ function CollectionDetail() {
   const collectionSales = sales.filter((s) => s.collectionSlug === c.slug);
 
   const stats = [
-    { l: "Floor Price", v: fmtUSDFull(c.floorPrice), change: c.change24h },
-    { l: "24h Volume", v: fmtUSD(c.volume24h), change: 4.2 },
-    { l: "7d Volume", v: fmtUSD(c.volume7d), change: c.change7d },
-    { l: "Supply", v: c.supply.toLocaleString() },
-    { l: "Owners", v: c.owners.toLocaleString() },
+    { l: "Reference Floor", v: fmtUSDFull(c.floorPrice), change: c.change24h },
+    { l: "Verified 24h Volume", v: fmtUSD(c.volume24h), change: 4.2 },
+    { l: "Verified 7d Volume", v: fmtUSD(c.volume7d), change: c.change7d },
+    { l: "Tracked Assets", v: c.trackedAssets.toLocaleString() },
+    { l: "Holders", v: c.owners.toLocaleString() },
   ];
 
   return (
@@ -45,11 +45,11 @@ function CollectionDetail() {
         <div className="flex-1">
           <div className="flex items-center gap-2 flex-wrap">
             <TypeBadge type={c.type} />
-            <span className="text-xs text-muted-foreground">{c.series}</span>
+            <span className="text-xs text-muted-foreground">{c.category} · {c.series}</span>
           </div>
           <h1 className="mt-2 text-2xl font-semibold tracking-tight">{c.name}</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Traded on <span className="text-foreground">{c.marketplace}</span>
+            Market intelligence from <span className="text-foreground">{c.marketplace}</span> and comparable sources. Mock data for now.
           </p>
         </div>
         <div className="flex gap-2">
@@ -77,8 +77,8 @@ function CollectionDetail() {
       <div className="rounded-lg border border-border bg-card">
         <div className="flex items-center justify-between p-5 border-b border-border">
           <div>
-            <h2 className="text-sm font-semibold">Floor price — last 30 days</h2>
-            <p className="text-xs text-muted-foreground mt-0.5">Mock data preview</p>
+            <h2 className="text-sm font-semibold">Reference pricing trend — last 30 days</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">Mock trend based on representative assets in this collection</p>
           </div>
           <div className="flex gap-1">
             {["7d", "30d", "90d", "All"].map((p, i) => (
@@ -91,7 +91,7 @@ function CollectionDetail() {
 
       <div className="rounded-lg border border-border bg-card">
         <div className="p-5 border-b border-border">
-          <h2 className="text-sm font-semibold">Recent sales — {c.name}</h2>
+          <h2 className="text-sm font-semibold">Verified sales — {c.name}</h2>
         </div>
         {collectionSales.length === 0 ? (
           <div className="p-8 text-center text-sm text-muted-foreground">No recent sales for this collection.</div>
@@ -100,9 +100,10 @@ function CollectionDetail() {
             <thead>
               <tr className="text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border">
                 <th className="text-left font-medium px-5 py-2">Asset</th>
-                <th className="text-right font-medium px-5 py-2">Price</th>
-                <th className="text-left font-medium px-5 py-2">Marketplace</th>
-                <th className="text-left font-medium px-5 py-2">Buyer</th>
+                <th className="text-left font-medium px-5 py-2">Grade</th>
+                <th className="text-right font-medium px-5 py-2">Sale price</th>
+                <th className="text-right font-medium px-5 py-2">Change</th>
+                <th className="text-left font-medium px-5 py-2">Source</th>
                 <th className="text-right font-medium px-5 py-2">Time</th>
               </tr>
             </thead>
@@ -113,9 +114,10 @@ function CollectionDetail() {
                     <img src={s.image} alt="" className="h-8 w-8 rounded object-cover bg-muted" />
                     <span className="font-medium">{s.asset}</span>
                   </td>
+                  <td className="px-5 py-3 text-muted-foreground">{s.grade}</td>
                   <td className="text-right font-mono tabular-nums font-semibold px-5 py-3">{fmtUSD(s.price)}</td>
+                  <td className="text-right px-5 py-3"><ChangeBadge value={s.priceChange} /></td>
                   <td className="px-5 py-3 text-muted-foreground">{s.marketplace}</td>
-                  <td className="px-5 py-3 font-mono text-xs text-muted-foreground">{s.buyer}</td>
                   <td className="text-right px-5 py-3 text-muted-foreground text-xs"><RelativeTime iso={s.time} /></td>
                 </tr>
               ))}

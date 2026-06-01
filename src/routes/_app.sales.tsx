@@ -1,12 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { sales, fmtUSD } from "@/lib/mock-data";
-import { TypeBadge } from "@/components/app/Badges";
+import { ChangeBadge, TypeBadge } from "@/components/app/Badges";
 import { RelativeTime } from "@/components/app/RelativeTime";
 
 export const Route = createFileRoute("/_app/sales")({
   component: SalesPage,
-  head: () => ({ meta: [{ title: "Recent Sales — Perp RWA" }] }),
+  head: () => ({ meta: [{ title: "Verified Sales — Perp RWA" }] }),
 });
 
 type Filter = "All" | "NFT" | "RWA" | "Phygital";
@@ -19,14 +19,14 @@ function SalesPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Recent Sales</h1>
-        <p className="text-sm text-muted-foreground mt-1">Latest transactions across tracked collectibles.</p>
+        <h1 className="text-2xl font-semibold tracking-tight">Verified Sales</h1>
+        <p className="text-sm text-muted-foreground mt-1">Asset-level sale intelligence across category, collection, grade, source, time, and price change.</p>
       </div>
 
       <div className="grid grid-cols-3 gap-4">
-        <Stat label="Total sales" value={rows.length.toString()} />
-        <Stat label="Total volume" value={fmtUSD(total)} />
-        <Stat label="Avg sale" value={fmtUSD(total / Math.max(rows.length, 1))} />
+        <Stat label="Verified sales" value={rows.length.toString()} />
+        <Stat label="Verified volume" value={fmtUSD(total)} />
+        <Stat label="Average sale" value={fmtUSD(total / Math.max(rows.length, 1))} />
       </div>
 
       <div className="flex items-center justify-between gap-3">
@@ -48,12 +48,13 @@ function SalesPage() {
           <thead>
             <tr className="text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border">
               <th className="text-left font-medium px-5 py-3">Asset</th>
+              <th className="text-left font-medium px-5 py-3">Category</th>
               <th className="text-left font-medium px-5 py-3">Collection</th>
+              <th className="text-left font-medium px-5 py-3">Grade</th>
               <th className="text-left font-medium px-5 py-3">Type</th>
-              <th className="text-right font-medium px-5 py-3">Price</th>
-              <th className="text-left font-medium px-5 py-3">Marketplace</th>
-              <th className="text-left font-medium px-5 py-3">Buyer</th>
-              <th className="text-left font-medium px-5 py-3">Seller</th>
+              <th className="text-right font-medium px-5 py-3">Sale price</th>
+              <th className="text-right font-medium px-5 py-3">Change</th>
+              <th className="text-left font-medium px-5 py-3">Source</th>
               <th className="text-right font-medium px-5 py-3">Time</th>
             </tr>
           </thead>
@@ -66,16 +67,17 @@ function SalesPage() {
                     <span className="font-medium">{s.asset}</span>
                   </div>
                 </td>
+                <td className="px-5 py-3 text-muted-foreground">{s.category}</td>
                 <td className="px-5 py-3">
                   <Link to="/collections/$slug" params={{ slug: s.collectionSlug }} className="text-muted-foreground hover:text-foreground">
                     {s.collectionName}
                   </Link>
                 </td>
+                <td className="px-5 py-3 text-muted-foreground">{s.grade}</td>
                 <td className="px-5 py-3"><TypeBadge type={s.type} /></td>
                 <td className="px-5 py-3 text-right font-mono tabular-nums font-semibold">{fmtUSD(s.price)}</td>
+                <td className="px-5 py-3 text-right"><ChangeBadge value={s.priceChange} /></td>
                 <td className="px-5 py-3 text-muted-foreground">{s.marketplace}</td>
-                <td className="px-5 py-3 font-mono text-xs text-muted-foreground">{s.buyer}</td>
-                <td className="px-5 py-3 font-mono text-xs text-muted-foreground">{s.seller}</td>
                 <td className="px-5 py-3 text-right text-muted-foreground text-xs"><RelativeTime iso={s.time} /></td>
               </tr>
             ))}
