@@ -107,20 +107,41 @@ function DataStatus({ data, error, loading }: { data: ReturnType<typeof useMarke
 
   return (
     <div className="rounded-lg border border-border bg-card p-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <div className="text-sm font-medium">{data.live ? "Live provider data" : "Mock fallback data"}</div>
-          <div className="text-xs text-muted-foreground mt-0.5">Window: {new Date(data.from).toLocaleDateString()} - {new Date(data.to).toLocaleDateString()}</div>
+          <div className="flex items-center gap-2 text-sm font-medium">
+            <span className={`h-2 w-2 rounded-full ${data.live ? "bg-success" : "bg-muted-foreground"}`} />
+            {data.live ? "Live sales feed active" : "Waiting for live provider configuration"}
+          </div>
+          <div className="text-xs text-muted-foreground mt-1">Window: {new Date(data.from).toLocaleDateString()} - {new Date(data.to).toLocaleDateString()}</div>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
           {data.providerStatus.map((provider) => (
-            <span key={provider.provider} className={`rounded border px-2 py-1 text-[11px] ${provider.ok ? "border-success/30 bg-success/10 text-success" : "border-border bg-surface text-muted-foreground"}`} title={provider.message}>
-              {provider.provider}
-            </span>
+            <ProviderPill key={provider.provider} provider={provider} />
           ))}
         </div>
       </div>
     </div>
+  );
+}
+
+function ProviderPill({ provider }: { provider: NonNullable<ReturnType<typeof useMarketSales>["data"]>["providerStatus"][number] }) {
+  const state = provider.ok ? "Live" : provider.enabled ? "Configured" : "Not configured";
+  const dotClass = provider.ok ? "bg-success" : provider.enabled ? "bg-primary" : "bg-muted-foreground";
+  const shellClass = provider.ok
+    ? "border-success/30 bg-success/10 text-success"
+    : provider.enabled
+      ? "border-primary/30 bg-primary/10 text-primary"
+      : "border-border bg-surface text-muted-foreground";
+
+  return (
+    <span className={`inline-flex min-w-[128px] items-center justify-between gap-2 rounded border px-2.5 py-1.5 text-[11px] ${shellClass}`} title={provider.message}>
+      <span className="inline-flex items-center gap-1.5 truncate">
+        <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dotClass}`} />
+        <span className="truncate">{provider.provider}</span>
+      </span>
+      <span className="font-medium">{state}</span>
+    </span>
   );
 }
 
