@@ -98,6 +98,8 @@ export function calculateIndexSnapshot(rawSales: Sale[], partialConfig: Partial<
     .filter((sale) => sale.confirmed && sale.market === config.market && sale.priceUsd > 0)
     .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
+  const lastConfirmedSale = confirmed[0] ?? null;
+  const previousConfirmedSale = confirmed[1] ?? null;
   const qualityChecked = markOutliers(markSuspiciousSales(confirmed, config), config);
   const valid = qualityChecked.filter((sale) => !sale.outlier && !sale.suspicious);
   const valid10m = valid.filter((sale) => inWindow(sale, now, 10));
@@ -134,9 +136,9 @@ export function calculateIndexSnapshot(rawSales: Sale[], partialConfig: Partial<
     indexName: config.indexName,
     market: config.market,
     indexPrice: round(vwap30m ?? lastSale?.priceUsd ?? 0, 4) ?? 0,
-    lastSalePrice: round(lastSale?.priceUsd ?? null, 4),
-    previousSalePrice: round(previousSale?.priceUsd ?? null, 4),
-    priceChangePercent: round(priceChange(lastSale?.priceUsd ?? null, previousSale?.priceUsd ?? null), 4),
+    lastSalePrice: round(lastConfirmedSale?.priceUsd ?? null, 4),
+    previousSalePrice: round(previousConfirmedSale?.priceUsd ?? null, 4),
+    priceChangePercent: round(priceChange(lastConfirmedSale?.priceUsd ?? null, previousConfirmedSale?.priceUsd ?? null), 4),
     vwap10m: round(vwap10m, 4),
     vwap30m: round(vwap30m, 4),
     volume10m: round(volume10m, 2) ?? 0,
