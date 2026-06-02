@@ -1,8 +1,6 @@
 import type { MarketSourceConfig, RuntimeEnv } from "./types";
 
 export const MARKET_NAMES: Record<string, string> = {
-  "pokemon-base-set": "Pokémon Cards",
-  "pokemon-151": "Pokémon Cards",
   "one-piece-romance-dawn": "One Piece Cards",
   "one-piece-paramount-war": "One Piece Cards",
   "nba-topshot-rare": "NBA Cards",
