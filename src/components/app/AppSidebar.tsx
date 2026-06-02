@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { LayoutDashboard, Layers, Activity, Star, Sparkles } from "lucide-react";
+import { LayoutDashboard, Layers, Activity, Sparkles } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -17,7 +17,6 @@ const nav = [
   { title: "Market Overview", url: "/dashboard", icon: LayoutDashboard },
   { title: "Markets", url: "/collections", icon: Layers },
   { title: "Verified Sales", url: "/sales", icon: Activity },
-  { title: "Watchlist", url: "/watchlist", icon: Star },
 ];
 
 export function AppSidebar() {
