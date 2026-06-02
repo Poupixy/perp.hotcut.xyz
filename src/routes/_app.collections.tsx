@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { collections, fmtUSD } from "@/lib/mock-data";
-import { ChangeBadge, TypeBadge } from "@/components/app/Badges";
+import { ChangeBadge } from "@/components/app/Badges";
 import { ArrowUpDown } from "lucide-react";
 
 export const Route = createFileRoute("/_app/collections")({
@@ -46,7 +46,6 @@ function CollectionsPage() {
               <th className="text-left font-medium px-5 py-3">Market</th>
               <th className="text-left font-medium px-5 py-3">Category</th>
               <th className="text-left font-medium px-5 py-3">Provider</th>
-              <th className="text-left font-medium px-5 py-3">Type</th>
               <th className="text-right font-medium px-5 py-3">Assets</th>
               <th className="text-right font-medium px-5 py-3">
                 <button className="inline-flex items-center gap-1 hover:text-foreground">Floor <ArrowUpDown className="h-3 w-3" /></button>
@@ -73,7 +72,6 @@ function CollectionsPage() {
                 </td>
                 <td className="px-5 py-3.5 text-muted-foreground">{c.category}</td>
                 <td className="px-5 py-3.5 text-muted-foreground">{c.marketplace}</td>
-                <td className="px-5 py-3.5"><TypeBadge type={c.type} /></td>
                 <td className="px-5 py-3.5 text-right font-mono tabular-nums text-muted-foreground">{c.trackedAssets.toLocaleString()}</td>
                 <td className="px-5 py-3.5 text-right font-mono tabular-nums">{fmtUSD(c.floorPrice)}</td>
                 <td className="px-5 py-3.5 text-right"><ChangeBadge value={c.change24h} /></td>
