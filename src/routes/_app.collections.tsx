@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { categories, collections, fmtUSD } from "@/lib/mock-data";
+import { collections, fmtUSD } from "@/lib/mock-data";
 import { ChangeBadge, TypeBadge } from "@/components/app/Badges";
 import { ArrowUpDown } from "lucide-react";
 
@@ -21,24 +21,6 @@ function CollectionsPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Markets</h1>
         <p className="text-sm text-muted-foreground mt-1">Top-level collectible markets with asset coverage, liquidity, and verified sale signals.</p>
-      </div>
-
-      <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-3">
-        {categories.map((category) => (
-          <div key={category.name} className="rounded-lg border border-border bg-card p-4">
-            <div className="text-sm font-semibold">{category.name}</div>
-            <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-              <div>
-                <div className="text-muted-foreground">Assets</div>
-                <div className="mt-0.5 font-mono">{category.assets.toLocaleString()}</div>
-              </div>
-              <div>
-                <div className="text-muted-foreground">24h Vol</div>
-                <div className="mt-0.5 font-mono">{fmtUSD(category.volume24h)}</div>
-              </div>
-            </div>
-          </div>
-        ))}
       </div>
 
       <div className="flex items-center justify-between gap-3">
