@@ -9,11 +9,12 @@ export const Route = createFileRoute("/_app/collections")({
   head: () => ({ meta: [{ title: "Markets — Perp RWA" }] }),
 });
 
-type Filter = "All" | "NFT" | "RWA" | "Phygital";
+const providers = ["All", ...Array.from(new Set(collections.map((c) => c.marketplace)))] as const;
+type ProviderFilter = (typeof providers)[number];
 
 function CollectionsPage() {
-  const [filter, setFilter] = useState<Filter>("All");
-  const filtered = collections.filter((c) => filter === "All" || c.type === filter);
+  const [provider, setProvider] = useState<ProviderFilter>("All");
+  const filtered = collections.filter((c) => provider === "All" || c.marketplace === provider);
 
   return (
     <div className="space-y-6">
@@ -42,13 +43,13 @@ function CollectionsPage() {
 
       <div className="flex items-center justify-between gap-3">
         <div className="flex gap-1 p-1 rounded-md bg-surface border border-border">
-          {(["All", "NFT", "RWA", "Phygital"] as Filter[]).map((f) => (
+          {providers.map((p) => (
             <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`text-xs px-3 py-1.5 rounded transition ${filter === f ? "bg-surface-raised text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+              key={p}
+              onClick={() => setProvider(p)}
+              className={`text-xs px-3 py-1.5 rounded transition ${provider === p ? "bg-surface-raised text-foreground" : "text-muted-foreground hover:text-foreground"}`}
             >
-              {f}
+              {p}
             </button>
           ))}
         </div>
@@ -62,6 +63,7 @@ function CollectionsPage() {
               <th className="text-left font-medium px-5 py-3 w-10">#</th>
               <th className="text-left font-medium px-5 py-3">Market</th>
               <th className="text-left font-medium px-5 py-3">Category</th>
+              <th className="text-left font-medium px-5 py-3">Provider</th>
               <th className="text-left font-medium px-5 py-3">Type</th>
               <th className="text-right font-medium px-5 py-3">Assets</th>
               <th className="text-right font-medium px-5 py-3">
@@ -88,6 +90,7 @@ function CollectionsPage() {
                   </Link>
                 </td>
                 <td className="px-5 py-3.5 text-muted-foreground">{c.category}</td>
+                <td className="px-5 py-3.5 text-muted-foreground">{c.marketplace}</td>
                 <td className="px-5 py-3.5"><TypeBadge type={c.type} /></td>
                 <td className="px-5 py-3.5 text-right font-mono tabular-nums text-muted-foreground">{c.trackedAssets.toLocaleString()}</td>
                 <td className="px-5 py-3.5 text-right font-mono tabular-nums">{fmtUSD(c.floorPrice)}</td>
