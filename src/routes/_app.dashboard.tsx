@@ -1,7 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { categories, collections, fmtUSD, sales } from "@/lib/mock-data";
-import { ChangeBadge, TypeBadge } from "@/components/app/Badges";
+import { categories, collections, fmtUSD } from "@/lib/mock-data";
+import { ChangeBadge } from "@/components/app/Badges";
 import { ArrowUpRight, TrendingUp, DollarSign, Layers, BarChart3 } from "lucide-react";
+import { usePokemonIndex } from "@/lib/rwa-index/use-pokemon-index";
+import type { IndexSnapshot, Sale as IndexSale } from "@/lib/rwa-index/models";
 
 export const Route = createFileRoute("/_app/dashboard")({
   component: Dashboard,
@@ -9,6 +11,7 @@ export const Route = createFileRoute("/_app/dashboard")({
 });
 
 function Dashboard() {
+  const pokemonIndex = usePokemonIndex();
   const totalVolume24h = collections.reduce((s, c) => s + c.volume24h, 0);
   const totalVolume7d = collections.reduce((s, c) => s + c.volume7d, 0);
   const topCategories = [...categories].sort((a, b) => b.volume24h - a.volume24h).slice(0, 4);
@@ -27,6 +30,8 @@ function Dashboard() {
         <h1 className="text-2xl font-semibold tracking-tight">Market Overview</h1>
         <p className="text-sm text-muted-foreground mt-1">Category, collection, asset, and verified-sales intelligence for tokenized collectibles.</p>
       </div>
+
+      <PokemonIndexPanel index={pokemonIndex.index} loading={pokemonIndex.loading} error={pokemonIndex.error} />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((s) => (
@@ -128,33 +133,80 @@ function Dashboard() {
             </Link>
           </div>
           <div className="divide-y divide-border">
-            {sales.slice(0, 6).map((sale) => (
-              <Link
-                key={sale.id}
-                to="/collections/$slug"
-                params={{ slug: sale.collectionSlug }}
-                className="flex items-center gap-3 p-3.5 hover:bg-surface-raised/50 transition"
-              >
-                <img src={sale.image} alt="" className="h-10 w-10 rounded-md object-cover bg-muted" />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-sm font-medium truncate">{sale.asset}</span>
-                    <TypeBadge type={sale.type} />
-                  </div>
-                  <div className="text-xs text-muted-foreground">{sale.category} · {sale.collectionName} · {sale.grade}</div>
-                </div>
-                <div className="text-right">
-                  <div className="text-sm font-semibold font-mono tabular-nums">{fmtUSD(sale.price)}</div>
-                  <div className="text-[10px] text-muted-foreground">{sale.marketplace}</div>
-                </div>
-                <ChangeBadge value={sale.priceChange} />
-              </Link>
-            ))}
+            {pokemonIndex.loading ? (
+              <div className="p-5 text-sm text-muted-foreground">Loading confirmed sales...</div>
+            ) : pokemonIndex.latestSales.length ? (
+              pokemonIndex.latestSales.map((sale) => <ConfirmedSaleRow key={sale.id} sale={sale} />)
+            ) : (
+              <div className="p-5 text-sm text-muted-foreground">No confirmed sales available.</div>
+            )}
           </div>
         </div>
       </div>
     </div>
   );
+}
+
+
+function PokemonIndexPanel({ index, loading, error }: { index?: IndexSnapshot; loading: boolean; error?: string }) {
+  return (
+    <div className="rounded-lg border border-border bg-card overflow-hidden">
+      <div className="flex flex-wrap items-start justify-between gap-4 p-5 border-b border-border">
+        <div>
+          <div className="text-xs uppercase tracking-wider text-muted-foreground">POKEMON-PERP index feed</div>
+          <h2 className="mt-1 text-xl font-semibold tracking-tight">POKEMON_INDEX</h2>
+          <p className="text-xs text-muted-foreground mt-1">Confirmed executed sales only. Listings and floor prices are excluded from the core index.</p>
+        </div>
+        <div className="flex items-center gap-2 rounded-md border border-border bg-surface px-3 py-2 text-xs">
+          <span className={`h-2 w-2 rounded-full ${index?.stale ? "bg-danger" : "bg-success"}`} />
+          {loading ? "Loading" : error ? "Unavailable" : index?.stale ? "Stale" : "Live"}
+        </div>
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-px bg-border">
+        <IndexMetric label="Index price" value={loading ? "..." : index ? fmtUSD(index.indexPrice) : "--"} />
+        <IndexMetric label="10m Pulse" value={formatNullableUsd(index?.vwap10m)} change={index?.growth10m} />
+        <IndexMetric label="30m Trend" value={formatNullableUsd(index?.vwap30m)} change={index?.growth30m} />
+        <IndexMetric label="Volume 10m" value={loading ? "..." : fmtUSD(index?.volume10m ?? 0)} />
+        <IndexMetric label="Volume 30m" value={loading ? "..." : fmtUSD(index?.volume30m ?? 0)} />
+        <IndexMetric label="Sales 10m" value={loading ? "..." : String(index?.salesCount10m ?? 0)} />
+        <IndexMetric label="Sales 30m" value={loading ? "..." : String(index?.salesCount30m ?? 0)} />
+        <IndexMetric label="Confidence" value={loading ? "..." : `${index?.confidenceScore ?? 0}/100`} />
+      </div>
+      {index?.staleReason && <div className="px-5 py-3 text-xs text-muted-foreground border-t border-border">{index.staleReason}</div>}
+    </div>
+  );
+}
+
+function IndexMetric({ label, value, change }: { label: string; value: string; change?: number | null }) {
+  return (
+    <div className="bg-card p-4 min-w-0">
+      <div className="text-[11px] uppercase tracking-wider text-muted-foreground truncate">{label}</div>
+      <div className="mt-1.5 flex items-center justify-between gap-2">
+        <span className="text-sm font-semibold font-mono tabular-nums truncate">{value}</span>
+        {typeof change === "number" && <ChangeBadge value={change} />}
+      </div>
+    </div>
+  );
+}
+
+function ConfirmedSaleRow({ sale }: { sale: IndexSale }) {
+  return (
+    <Link to="/collections/$slug" params={{ slug: sale.market }} className="flex items-center gap-3 p-3.5 hover:bg-surface-raised/50 transition">
+      {sale.assetImage ? <img src={sale.assetImage} alt="" className="h-10 w-10 rounded-md object-cover bg-muted" /> : <div className="h-10 w-10 rounded-md bg-muted" />}
+      <div className="flex-1 min-w-0">
+        <div className="text-sm font-medium truncate">{sale.assetName}</div>
+        <div className="text-xs text-muted-foreground">{sale.platform} · {sale.grade ?? "Confirmed sale"}</div>
+      </div>
+      <div className="text-right">
+        <div className="text-sm font-semibold font-mono tabular-nums">{fmtUSD(sale.priceUsd)}</div>
+        <div className="text-[10px] text-muted-foreground">{new Date(sale.timestamp).toLocaleTimeString()}</div>
+      </div>
+    </Link>
+  );
+}
+
+function formatNullableUsd(value?: number | null) {
+  return typeof value === "number" ? fmtUSD(value) : "--";
 }
 
 function ChartPlaceholder() {
