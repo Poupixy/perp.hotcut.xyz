@@ -15,7 +15,7 @@ import {
 
 const nav = [
   { title: "Market Overview", url: "/dashboard", icon: LayoutDashboard },
-  { title: "Collections", url: "/collections", icon: Layers },
+  { title: "Markets", url: "/collections", icon: Layers },
   { title: "Verified Sales", url: "/sales", icon: Activity },
   { title: "Watchlist", url: "/watchlist", icon: Star },
 ];

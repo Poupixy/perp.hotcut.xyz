@@ -6,7 +6,7 @@ import { ArrowUpDown } from "lucide-react";
 
 export const Route = createFileRoute("/_app/collections")({
   component: CollectionsPage,
-  head: () => ({ meta: [{ title: "Collections — Perp RWA" }] }),
+  head: () => ({ meta: [{ title: "Markets — Perp RWA" }] }),
 });
 
 type Filter = "All" | "NFT" | "RWA" | "Phygital";
@@ -18,8 +18,8 @@ function CollectionsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Collections</h1>
-        <p className="text-sm text-muted-foreground mt-1">Collections grouped under market categories, with mock liquidity and pricing signals.</p>
+        <h1 className="text-2xl font-semibold tracking-tight">Markets</h1>
+        <p className="text-sm text-muted-foreground mt-1">Top-level collectible markets with asset coverage, liquidity, and verified sale signals.</p>
       </div>
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-3">
@@ -52,7 +52,7 @@ function CollectionsPage() {
             </button>
           ))}
         </div>
-        <div className="text-xs text-muted-foreground font-mono">{filtered.length} collections</div>
+        <div className="text-xs text-muted-foreground font-mono">{filtered.length} markets</div>
       </div>
 
       <div className="rounded-lg border border-border bg-card overflow-hidden">
@@ -60,7 +60,7 @@ function CollectionsPage() {
           <thead>
             <tr className="text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border">
               <th className="text-left font-medium px-5 py-3 w-10">#</th>
-              <th className="text-left font-medium px-5 py-3">Collection</th>
+              <th className="text-left font-medium px-5 py-3">Market</th>
               <th className="text-left font-medium px-5 py-3">Category</th>
               <th className="text-left font-medium px-5 py-3">Type</th>
               <th className="text-right font-medium px-5 py-3">Assets</th>
