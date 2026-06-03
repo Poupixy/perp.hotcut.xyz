@@ -10,6 +10,8 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+data/*.json
+!data/.gitkeep
 .output
 .vinxi
 .tanstack/**
