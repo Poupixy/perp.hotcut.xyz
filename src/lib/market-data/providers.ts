@@ -27,6 +27,29 @@ function toIsoFromSeconds(value: unknown): string | undefined {
   return seconds ? new Date(seconds * 1000).toISOString() : undefined;
 }
 
+function toIsoDate(value: unknown): string | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return new Date(value > 1_000_000_000_000 ? value : value * 1000).toISOString();
+  }
+  if (typeof value === "string" && value.trim()) {
+    const numeric = Number(value);
+    if (Number.isFinite(numeric) && /^\d+(\.\d+)?$/.test(value.trim())) {
+      return new Date(numeric > 1_000_000_000_000 ? numeric : numeric * 1000).toISOString();
+    }
+    const parsed = Date.parse(value);
+    return Number.isFinite(parsed) ? new Date(parsed).toISOString() : undefined;
+  }
+  return undefined;
+}
+
+function marketplaceFromActivitySource(value: unknown): string {
+  const source = asString(value)?.toLowerCase() ?? "";
+  if (source.includes("tensor")) return "Tensor";
+  if (source === "mmm") return "Magic Eden MMM";
+  if (source.includes("magiceden") || source.includes("magic_eden")) return "Magic Eden";
+  return asString(value) ?? "Magic Eden";
+}
+
 function isWithinWindow(iso: string, window: FetchWindow): boolean {
   const time = new Date(iso).getTime();
   return time >= window.from.getTime() && time <= window.to.getTime();
@@ -59,21 +82,23 @@ function extractMagicEdenSale(item: unknown, marketSlug: string, symbol: string)
 
   const token = asRecord(row.token);
   const txSignature = asString(row.txId) ?? asString(row.signature) ?? asString(row.transactionSignature);
-  const saleTime = asString(row.blockTime) ?? asString(row.createdAt) ?? asString(row.created_at) ?? toIsoFromSeconds(row.blockTimestamp) ?? toIsoFromSeconds(row.timestamp);
-  const price = asNumber(row.price) ?? asNumber(row.priceUsd) ?? asNumber(row.listedPrice);
+  const saleTime = toIsoDate(row.blockTime) ?? toIsoDate(row.createdAt) ?? toIsoDate(row.created_at) ?? toIsoDate(row.blockTimestamp) ?? toIsoDate(row.timestamp);
+  const usdPrice = asNumber(row.priceUsd);
+  const price = usdPrice ?? asNumber(row.price) ?? asNumber(row.listedPrice);
   if (!saleTime || !price) return undefined;
+  const tokenMint = asString(row.tokenMint) ?? asString(row.mint);
 
   return {
-    id: makeId(["me", marketSlug, symbol, txSignature, asString(row.tokenMint) ?? asString(row.mint), saleTime]),
+    id: makeId(["me", marketSlug, symbol, txSignature, tokenMint, saleTime]),
     marketSlug,
     marketName: MARKET_NAMES[marketSlug] ?? marketSlug,
-    assetName: asString(row.tokenName) ?? asString(token.name) ?? asString(row.name) ?? "Unknown asset",
+    assetName: asString(row.tokenName) ?? asString(token.name) ?? asString(row.name) ?? (tokenMint ? `${symbol} ${tokenMint.slice(0, 6)}` : `${symbol} asset`),
     assetImage: asString(row.tokenImg) ?? asString(token.image) ?? asString(row.image),
     grade: asString(row.grade),
     salePrice: price,
-    currency: asString(row.currency) ?? "SOL",
+    currency: usdPrice ? "USD" : asString(row.currency) ?? "SOL",
     saleTime,
-    marketplace: "Magic Eden",
+    marketplace: marketplaceFromActivitySource(row.source),
     source: "magic-eden",
     sourceUrl: txSignature ? `https://solscan.io/tx/${txSignature}` : undefined,
     txSignature,
