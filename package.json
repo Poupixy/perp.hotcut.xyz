@@ -12,7 +12,9 @@
     "format": "prettier --write .",
     "ingest:sales": "tsx src/lib/provider-ingestion/cli.ts ingest",
     "ingest:magiceden": "tsx src/lib/provider-ingestion/cli.ts ingest --provider magic-eden",
-    "providers:status": "tsx src/lib/provider-ingestion/cli.ts status"
+    "providers:status": "tsx src/lib/provider-ingestion/cli.ts status",
+    "refresh:nfts": "tsx src/jobs/refreshTrackedNfts.ts",
+    "test:nft-ingestion": "tsx src/jobs/testNftIngestion.ts"
   },
   "dependencies": {
     "@cloudflare/vite-plugin": "^1.25.5",

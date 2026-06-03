@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { categories, collections, fmtUSD } from "@/lib/mock-data";
 import { ChangeBadge } from "@/components/app/Badges";
 import { ArrowUpRight, TrendingUp, DollarSign, Layers, BarChart3 } from "lucide-react";
@@ -47,6 +48,8 @@ function Dashboard() {
           </div>
         ))}
       </div>
+
+      <TrackedNftsPanel />
 
       <div className="grid lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2 rounded-lg border border-border bg-card">
@@ -233,6 +236,159 @@ function ChartPlaceholder() {
         <path d={area} fill="url(#g)" />
         <path d={path} fill="none" stroke="oklch(0.78 0.14 75)" strokeWidth="2" />
       </svg>
+    </div>
+  );
+}
+
+
+type TrackedNftAsset = {
+  mint: string;
+  market: string;
+  name: string | null;
+  image: string | null;
+  owner: string | null;
+  collection: string | null;
+  updated_at: string;
+};
+
+type TrackedNftView = {
+  mint: string;
+  market: string;
+  label: string | null;
+  active: boolean;
+  last_fetched_at: string | null;
+  asset: TrackedNftAsset | null;
+};
+
+const NFT_MARKET_OPTIONS = [
+  ["pokemon", "Pokémon"],
+  ["one_piece", "One Piece"],
+  ["nba", "NBA"],
+  ["nfl", "NFL"],
+  ["nhl", "NHL"],
+  ["sealed_products", "Sealed Products"],
+  ["graded_cards", "Graded Cards"],
+  ["other_cards", "Other Cards"],
+] as const;
+
+function TrackedNftsPanel() {
+  const [items, setItems] = useState<TrackedNftView[]>([]);
+  const [mint, setMint] = useState("");
+  const [market, setMarket] = useState("pokemon");
+  const [label, setLabel] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState<string | null>(null);
+
+  async function load() {
+    setLoading(true);
+    try {
+      const response = await fetch("/api/nfts/tracked", { headers: { accept: "application/json" } });
+      const payload = await response.json() as { nfts?: TrackedNftView[]; error?: string };
+      if (!response.ok) throw new Error(payload.error ?? "Unable to load tracked NFTs");
+      setItems(payload.nfts ?? []);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to load tracked NFTs");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void load();
+  }, []);
+
+  async function postJson(url: string, body: unknown) {
+    setMessage(null);
+    const response = await fetch(url, { method: "POST", headers: { "content-type": "application/json", accept: "application/json" }, body: JSON.stringify(body) });
+    const payload = await response.json().catch(() => ({})) as { error?: string; message?: string };
+    if (!response.ok) throw new Error(payload.error ?? payload.message ?? "Request failed");
+    return payload;
+  }
+
+  async function track() {
+    try {
+      await postJson("/api/nfts/track", { mint, market, label });
+      setMint("");
+      setLabel("");
+      setMessage("NFT added to tracked_nfts.");
+      await load();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to track NFT");
+    }
+  }
+
+  async function untrack(targetMint: string) {
+    try {
+      await postJson("/api/nfts/untrack", { mint: targetMint });
+      setMessage("NFT marked inactive.");
+      await load();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to untrack NFT");
+    }
+  }
+
+  async function refresh(targetMint: string) {
+    try {
+      const payload = await postJson("/api/nfts/refresh", { mint: targetMint, force: false }) as { status?: string; message?: string; retryAfterMs?: number };
+      setMessage(payload.retryAfterMs ? `${payload.message} Retry after ${Math.ceil(payload.retryAfterMs / 1000)}s.` : payload.message ?? "Refresh requested.");
+      await load();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to refresh NFT");
+    }
+  }
+
+  return (
+    <div className="rounded-lg border border-border bg-card overflow-hidden">
+      <div className="flex flex-wrap items-start justify-between gap-4 p-5 border-b border-border">
+        <div>
+          <h2 className="text-sm font-semibold">Controlled NFT tracking</h2>
+          <p className="text-xs text-muted-foreground mt-0.5">Only allowlisted mints in tracked_nfts can be fetched through the server-side Helius queue.</p>
+        </div>
+        <div className="text-[11px] text-muted-foreground font-mono">2 Helius calls/min max</div>
+      </div>
+
+      <div className="grid lg:grid-cols-[1fr_1fr] gap-px bg-border">
+        <div className="bg-card p-5 space-y-3">
+          <input value={mint} onChange={(event) => setMint(event.target.value)} placeholder="NFT mint address" className="w-full h-10 rounded-md border border-border bg-surface px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring" />
+          <div className="grid sm:grid-cols-2 gap-3">
+            <select value={market} onChange={(event) => setMarket(event.target.value)} className="h-10 rounded-md border border-border bg-surface px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
+              {NFT_MARKET_OPTIONS.map(([value, name]) => <option key={value} value={value}>{name}</option>)}
+            </select>
+            <input value={label} onChange={(event) => setLabel(event.target.value)} placeholder="Optional label" className="h-10 rounded-md border border-border bg-surface px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring" />
+          </div>
+          <button onClick={track} className="h-10 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition">Track NFT</button>
+          {message && <div className="text-xs text-muted-foreground">{message}</div>}
+        </div>
+
+        <div className="bg-card divide-y divide-border max-h-[520px] overflow-auto">
+          {loading ? (
+            <div className="p-5 text-sm text-muted-foreground">Loading tracked NFTs...</div>
+          ) : items.length === 0 ? (
+            <div className="p-5 text-sm text-muted-foreground">No tracked NFTs yet.</div>
+          ) : items.map((item) => (
+            <div key={item.mint} className="p-4 flex gap-3">
+              {item.asset?.image ? <img src={item.asset.image} alt="" className="h-14 w-14 rounded-md object-cover bg-muted" /> : <div className="h-14 w-14 rounded-md bg-muted" />}
+              <div className="flex-1 min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="font-medium text-sm truncate">{item.asset?.name ?? item.label ?? "Unfetched NFT"}</div>
+                  {!item.active && <span className="rounded border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground">Inactive</span>}
+                </div>
+                <div className="mt-1 text-xs text-muted-foreground font-mono truncate">{item.mint}</div>
+                <div className="mt-1 grid sm:grid-cols-2 gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                  <span>Market: {item.market}</span>
+                  <span>Last fetch: {item.last_fetched_at ? new Date(item.last_fetched_at).toLocaleString() : "Never"}</span>
+                  <span className="truncate">Owner: {item.asset?.owner ?? "--"}</span>
+                  <span className="truncate">Collection: {item.asset?.collection ?? "--"}</span>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button onClick={() => refresh(item.mint)} disabled={!item.active} className="h-8 px-3 rounded-md border border-border bg-surface text-xs hover:bg-surface-raised disabled:opacity-50">Refresh</button>
+                  {item.active && <button onClick={() => untrack(item.mint)} className="h-8 px-3 rounded-md border border-border bg-surface text-xs text-muted-foreground hover:text-foreground hover:bg-surface-raised">Untrack</button>}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
