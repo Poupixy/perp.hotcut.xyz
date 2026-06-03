@@ -29,8 +29,8 @@ function Landing() {
       <header className="sticky top-0 z-40 border-b border-border/60 bg-background/70 backdrop-blur-xl">
         <div className="mx-auto max-w-7xl px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/15 ring-1 ring-primary/30">
-              <Sparkles className="h-4 w-4 text-primary" />
+            <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-md bg-surface-raised ring-1 ring-primary/35 shadow-[0_0_22px_oklch(0.62_0.225_258_/_0.18)]">
+              <img src="/perp-rwa-logo-icon.png" alt="" className="h-8 w-8 object-cover" />
             </div>
             <span className="text-sm font-semibold tracking-tight">Perp RWA</span>
             <span className="ml-2 text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-surface text-muted-foreground border border-border">V1</span>
@@ -51,7 +51,7 @@ function Landing() {
 
       <section className="relative overflow-hidden border-b border-border">
         <div className="absolute inset-0 bg-grid opacity-60" />
-        <div className="absolute inset-x-0 top-0 h-[500px] bg-[radial-gradient(ellipse_60%_50%_at_50%_0%,oklch(0.78_0.14_75_/_0.12),transparent)]" />
+        <div className="absolute inset-x-0 top-0 h-[500px] bg-[radial-gradient(ellipse_60%_50%_at_50%_0%,oklch(0.62_0.225_258_/_0.18),transparent)]" />
         <div className="relative mx-auto max-w-7xl px-6 py-24 sm:py-32">
           <div className="inline-flex items-center gap-2 rounded-full border border-border bg-surface/70 px-3 py-1 text-xs text-muted-foreground mb-6">
             <span className="h-1.5 w-1.5 rounded-full bg-success animate-pulse" />
@@ -59,7 +59,7 @@ function Landing() {
           </div>
           <h1 className="text-4xl sm:text-6xl font-semibold tracking-tight max-w-3xl leading-[1.05]">
             Market intelligence for{" "}
-            <span className="text-gradient-gold">tokenized collectibles</span>.
+            <span className="text-gradient-brand">tokenized collectibles</span>.
           </h1>
           <p className="mt-6 text-base sm:text-lg text-muted-foreground max-w-xl leading-relaxed">
             A market intelligence platform for tokenized collectibles, tracking

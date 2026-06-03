@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { LayoutDashboard, Layers, Activity, Sparkles } from "lucide-react";
+import { LayoutDashboard, Layers, Activity } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -27,8 +27,8 @@ export function AppSidebar() {
     <Sidebar collapsible="icon" className="border-r border-sidebar-border">
       <SidebarHeader className="border-b border-sidebar-border">
         <Link to="/" className="flex items-center gap-2.5 px-2 py-2.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/15 ring-1 ring-primary/30">
-            <Sparkles className="h-4 w-4 text-primary" />
+          <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-md bg-surface-raised ring-1 ring-primary/35 shadow-[0_0_18px_oklch(0.62_0.225_258_/_0.16)]">
+            <img src="/perp-rwa-logo-icon.png" alt="" className="h-8 w-8 object-cover" />
           </div>
           <div className="flex flex-col leading-tight group-data-[collapsible=icon]:hidden">
             <span className="text-sm font-semibold tracking-tight">Perp RWA</span>
