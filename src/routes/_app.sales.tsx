@@ -26,13 +26,13 @@ function SalesPage() {
   const average = usdRows.length ? total / usdRows.length : 0;
   const nftRows = useMemo(() => {
     return trackedNfts.items.filter((nft) => {
-      if (!nft.active || !nft.asset) return false;
+      if (!nft.active) return false;
       if (nftMarketFilter !== "all" && nft.market !== nftMarketFilter) return false;
-      if (nftCollectionFilter !== "all" && nft.asset.collection !== nftCollectionFilter) return false;
+      if (nftCollectionFilter !== "all" && nft.asset?.collection !== nftCollectionFilter) return false;
       return true;
     });
   }, [trackedNfts.items, nftMarketFilter, nftCollectionFilter]);
-  const nftMarkets = useMemo(() => Array.from(new Set(trackedNfts.items.filter((nft) => nft.active && nft.asset).map((nft) => nft.market))).sort(), [trackedNfts.items]);
+  const nftMarkets = useMemo(() => Array.from(new Set(trackedNfts.items.filter((nft) => nft.active).map((nft) => nft.market))).sort(), [trackedNfts.items]);
   const nftCollections = useMemo(() => Array.from(new Set(trackedNfts.items.map((nft) => nft.asset?.collection).filter((value): value is string => Boolean(value)))).sort(), [trackedNfts.items]);
 
   return (
@@ -54,12 +54,14 @@ function SalesPage() {
         nfts={nftRows}
         loading={trackedNfts.loading}
         error={trackedNfts.error}
+        status={trackedNfts.status}
         markets={nftMarkets}
         collections={nftCollections}
         marketFilter={nftMarketFilter}
         collectionFilter={nftCollectionFilter}
         onMarketChange={setNftMarketFilter}
         onCollectionChange={setNftCollectionFilter}
+        onReload={trackedNfts.load}
       />
 
       <div className="flex items-center justify-between gap-3">
@@ -180,6 +182,25 @@ function Stat({ label, value }: { label: string; value: string }) {
 }
 
 
+const NFT_MARKET_OPTIONS = [
+  ["pokemon", "Pokémon"],
+  ["one_piece", "One Piece"],
+  ["nba", "NBA"],
+  ["nfl", "NFL"],
+  ["nhl", "NHL"],
+  ["sealed_products", "Sealed Products"],
+  ["graded_cards", "Graded Cards"],
+  ["other_cards", "Other Cards"],
+] as const;
+
+type NftIngestionStatus = {
+  heliusConfigured: boolean;
+  trackedCount: number;
+  activeTrackedCount: number;
+  fetchedAssetCount: number;
+  queue: { queue: string[]; processing: boolean; lastHeliusCallAt: string | null; backoffUntil: string | null };
+};
+
 type TrackedNftAsset = {
   mint: string;
   market: string;
@@ -203,58 +224,119 @@ function useTrackedNftAssets() {
   const [items, setItems] = useState<TrackedNftAsset[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | undefined>();
+  const [status, setStatus] = useState<NftIngestionStatus | undefined>();
 
-  useEffect(() => {
-    const controller = new AbortController();
-    async function load() {
+  async function load(signal?: AbortSignal) {
       setLoading(true);
       setError(undefined);
       try {
-        const response = await fetch("/api/nfts/tracked?active=true&fetched=true", { signal: controller.signal, headers: { accept: "application/json" } });
-        const payload = await response.json() as { nfts?: TrackedNftAsset[]; error?: string };
-        if (!response.ok) throw new Error(payload.error ?? "Unable to load tracked NFT assets");
+        const [trackedResponse, statusResponse] = await Promise.all([
+          fetch("/api/nfts/tracked?active=true&fetched=false", { signal, headers: { accept: "application/json" } }),
+          fetch("/api/nfts/status", { signal, headers: { accept: "application/json" } }),
+        ]);
+        const payload = await trackedResponse.json() as { nfts?: TrackedNftAsset[]; error?: string };
+        const statusPayload = await statusResponse.json() as NftIngestionStatus;
+        if (!trackedResponse.ok) throw new Error(payload.error ?? "Unable to load tracked NFT assets");
         setItems(payload.nfts ?? []);
+        setStatus(statusPayload);
       } catch (error) {
-        if (controller.signal.aborted) return;
+        if (signal?.aborted) return;
         setError(error instanceof Error ? error.message : "Unable to load tracked NFT assets");
       } finally {
-        if (!controller.signal.aborted) setLoading(false);
+        if (!signal?.aborted) setLoading(false);
       }
-    }
-    void load();
+  }
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void load(controller.signal);
     return () => controller.abort();
   }, []);
 
-  return { items, loading, error };
+  return { items, loading, error, status, load: () => load() };
 }
 
 function TrackedNftSalesPanel({
   nfts,
   loading,
   error,
+  status,
   markets,
   collections,
   marketFilter,
   collectionFilter,
   onMarketChange,
   onCollectionChange,
+  onReload,
 }: {
   nfts: TrackedNftAsset[];
   loading: boolean;
   error?: string;
+  status?: NftIngestionStatus;
   markets: string[];
   collections: string[];
   marketFilter: string;
   collectionFilter: string;
   onMarketChange: (value: string) => void;
   onCollectionChange: (value: string) => void;
+  onReload: () => Promise<void>;
 }) {
+  const [mint, setMint] = useState("");
+  const [market, setMarket] = useState("pokemon");
+  const [label, setLabel] = useState("");
+  const [message, setMessage] = useState<string | null>(null);
+
+  async function postJson(url: string, body: unknown) {
+    const response = await fetch(url, { method: "POST", headers: { "content-type": "application/json", accept: "application/json" }, body: JSON.stringify(body) });
+    const payload = await response.json().catch(() => ({})) as { error?: string; message?: string; status?: string; retryAfterMs?: number };
+    if (!response.ok) throw new Error(payload.error ?? payload.message ?? "Request failed");
+    return payload;
+  }
+
+  async function track() {
+    try {
+      setMessage(null);
+      await postJson("/api/nfts/track", { mint, market, label });
+      setMint("");
+      setLabel("");
+      setMessage("NFT ajouté dans tracked_nfts. Lance Refresh quand HELIUS_API_KEY est configurée.");
+      await onReload();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to track NFT");
+    }
+  }
+
+  async function refresh(targetMint: string) {
+    try {
+      const payload = await postJson("/api/nfts/refresh", { mint: targetMint, force: false });
+      setMessage(payload.retryAfterMs ? `${payload.message}. Retry after ${Math.ceil(payload.retryAfterMs / 1000)}s.` : payload.message ?? "Refresh requested.");
+      await onReload();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to refresh NFT");
+    }
+  }
+
+  async function untrack(targetMint: string) {
+    try {
+      await postJson("/api/nfts/untrack", { mint: targetMint });
+      setMessage("NFT désactivé dans tracked_nfts.");
+      await onReload();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to untrack NFT");
+    }
+  }
+
   return (
     <div className="rounded-lg border border-border bg-card overflow-hidden">
       <div className="flex flex-wrap items-start justify-between gap-4 p-5 border-b border-border">
         <div>
           <h2 className="text-sm font-semibold">Stored tracked NFT assets</h2>
-          <p className="text-xs text-muted-foreground mt-0.5">Fetched NFTs stored from the controlled Helius allowlist. No untracked mint or collection scan is shown here.</p>
+          <p className="text-xs text-muted-foreground mt-0.5">NFTs stored from the controlled Helius allowlist. Pending tracked NFTs stay visible until they are fetched.</p>
+          <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-muted-foreground">
+            <span className={`rounded border px-2 py-1 ${status?.heliusConfigured ? "border-success/30 bg-success/10 text-success" : "border-danger/30 bg-danger/10 text-danger"}`}>Helius {status?.heliusConfigured ? "configured" : "missing key"}</span>
+            <span className="rounded border border-border bg-surface px-2 py-1">Tracked {status?.activeTrackedCount ?? 0}</span>
+            <span className="rounded border border-border bg-surface px-2 py-1">Fetched {status?.fetchedAssetCount ?? 0}</span>
+          </div>
         </div>
         <div className="flex flex-wrap gap-2">
           <select value={marketFilter} onChange={(event) => onMarketChange(event.target.value)} className="h-9 rounded-md border border-border bg-surface px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring">
@@ -265,6 +347,25 @@ function TrackedNftSalesPanel({
             <option value="all">All NFT collections</option>
             {collections.map((collection) => <option key={collection} value={collection}>{shorten(collection, 18)}</option>)}
           </select>
+        </div>
+      </div>
+
+      <div className="grid lg:grid-cols-[1fr_1.5fr] gap-px bg-border border-b border-border">
+        <div className="bg-card p-5 space-y-3">
+          <input value={mint} onChange={(event) => setMint(event.target.value)} placeholder="NFT mint address" className="w-full h-10 rounded-md border border-border bg-surface px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring" />
+          <div className="grid sm:grid-cols-2 gap-3">
+            <select value={market} onChange={(event) => setMarket(event.target.value)} className="h-10 rounded-md border border-border bg-surface px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
+              {NFT_MARKET_OPTIONS.map(([value, name]) => <option key={value} value={value}>{name}</option>)}
+            </select>
+            <input value={label} onChange={(event) => setLabel(event.target.value)} placeholder="Optional label" className="h-10 rounded-md border border-border bg-surface px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring" />
+          </div>
+          <button onClick={track} className="h-10 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition">Track NFT</button>
+          {message && <div className="text-xs text-muted-foreground">{message}</div>}
+        </div>
+        <div className="bg-card p-5 text-xs text-muted-foreground leading-relaxed">
+          <div className="font-medium text-foreground">Filtrage strict</div>
+          <p className="mt-1">Seuls les mints ajoutés ici ou présents dans TARGET_NFTS sont récupérables. Aucun scan de collection et aucun NFT aléatoire.</p>
+          {!status?.heliusConfigured && <p className="mt-2 text-danger">HELIUS_API_KEY n’est pas configurée dans le conteneur, donc les NFTs suivis resteront en attente jusqu’à configuration.</p>}
         </div>
       </div>
 
@@ -301,8 +402,14 @@ function TrackedNftSalesPanel({
                 <td className="px-5 py-3 text-muted-foreground">{nft.market}</td>
                 <td className="px-5 py-3 text-muted-foreground font-mono text-xs">{nft.asset?.collection ? shorten(nft.asset.collection, 18) : "--"}</td>
                 <td className="px-5 py-3 text-muted-foreground font-mono text-xs">{nft.asset?.owner ? shorten(nft.asset.owner, 12) : "--"}</td>
-                <td className="px-5 py-3 text-muted-foreground">{nft.asset?.token_standard ?? nft.asset?.interface ?? "--"}</td>
-                <td className="px-5 py-3 text-right text-muted-foreground text-xs">{nft.last_fetched_at ? <RelativeTime iso={nft.last_fetched_at} /> : "Never"}</td>
+                <td className="px-5 py-3 text-muted-foreground">{nft.asset?.token_standard ?? nft.asset?.interface ?? "Pending"}</td>
+                <td className="px-5 py-3 text-right text-muted-foreground text-xs">
+                  <div>{nft.last_fetched_at ? <RelativeTime iso={nft.last_fetched_at} /> : "Pending"}</div>
+                  <div className="mt-2 flex justify-end gap-2">
+                    <button onClick={() => refresh(nft.mint)} className="rounded border border-border bg-surface px-2 py-1 text-[10px] hover:bg-surface-raised">Refresh</button>
+                    <button onClick={() => untrack(nft.mint)} className="rounded border border-border bg-surface px-2 py-1 text-[10px] hover:bg-surface-raised">Untrack</button>
+                  </div>
+                </td>
               </tr>
             ))}
           </tbody>
