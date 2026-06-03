@@ -3,10 +3,12 @@ import { ArrowRight, Sparkles, TrendingUp, Layers, ShieldCheck, Activity } from 
 import { categories, fmtUSD, sales } from "@/lib/mock-data";
 
 const trackedPlatforms = [
-  { name: "Collector Crypt", market: "Phygital cards", refresh: "10 min refresh", sales: "150 NFT sales" },
-  { name: "Magic Eden", market: "NFT marketplaces", refresh: "10 min refresh", sales: "150 NFT sales" },
-  { name: "Tensor", market: "Solana NFTs", refresh: "10 min refresh", sales: "150 NFT sales" },
-  { name: "Helius / Solscan", market: "On-chain fallback", refresh: "10 min refresh", sales: "150 NFT sales" },
+  { name: "Magic Eden", market: "Live marketplace sales", status: "Live", statusTone: "live", refresh: "10 min refresh", coverage: "89 sales · 7d" },
+  { name: "Phygitals", market: "Tracked via Magic Eden symbols", status: "Watching", statusTone: "watching", refresh: "10 min refresh", coverage: "0 sales · 30d" },
+  { name: "Collector Crypt", market: "Needs official API or on-chain IDs", status: "To connect", statusTone: "pending", refresh: "Pending", coverage: "No public API" },
+  { name: "Beezie", market: "Marketplace identified", status: "To connect", statusTone: "pending", refresh: "Pending", coverage: "Needs chain IDs" },
+  { name: "Tensor", market: "Seen through Magic Eden aggregator", status: "Indirect", statusTone: "watching", refresh: "10 min refresh", coverage: "Via Magic Eden" },
+  { name: "Helius / Solscan", market: "On-chain fallback", status: "Ready", statusTone: "pending", refresh: "Needs API keys", coverage: "Not active" },
 ];
 
 export const Route = createFileRoute("/")({
@@ -68,11 +70,11 @@ function Landing() {
             <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
               <div>
                 <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Tracked platforms</div>
-                <div className="text-sm font-semibold">Provider coverage and refresh cadence</div>
+                <div className="text-sm font-semibold">Live data coverage by provider</div>
               </div>
               <div className="hidden sm:flex items-center gap-1.5 text-xs text-success">
                 <span className="h-1.5 w-1.5 rounded-full bg-success animate-pulse" />
-                Live tracking
+                Magic Eden live
               </div>
             </div>
             <div className="grid sm:grid-cols-2 gap-px bg-border">
@@ -83,7 +85,10 @@ function Landing() {
                       <div className="font-semibold">{platform.name}</div>
                       <div className="mt-0.5 text-xs text-muted-foreground">{platform.market}</div>
                     </div>
-                    <span className="h-2 w-2 rounded-full bg-success shadow-[0_0_14px_oklch(0.68_0.16_145)]" />
+                    <div className={`inline-flex items-center gap-1.5 rounded border px-2 py-1 text-[11px] ${platform.statusTone === "live" ? "border-success/30 bg-success/10 text-success" : platform.statusTone === "watching" ? "border-primary/30 bg-primary/10 text-primary" : "border-border bg-surface text-muted-foreground"}`}>
+                      <span className={`h-1.5 w-1.5 rounded-full ${platform.statusTone === "live" ? "bg-success animate-pulse" : platform.statusTone === "watching" ? "bg-primary" : "bg-muted-foreground"}`} />
+                      {platform.status}
+                    </div>
                   </div>
                   <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
                     <div className="rounded-md border border-border bg-surface px-3 py-2">
@@ -91,8 +96,8 @@ function Landing() {
                       <div className="mt-1 font-mono font-semibold">{platform.refresh}</div>
                     </div>
                     <div className="rounded-md border border-border bg-surface px-3 py-2">
-                      <div className="text-muted-foreground">Window</div>
-                      <div className="mt-1 font-mono font-semibold">{platform.sales}</div>
+                      <div className="text-muted-foreground">Coverage</div>
+                      <div className="mt-1 font-mono font-semibold">{platform.coverage}</div>
                     </div>
                   </div>
                 </div>
