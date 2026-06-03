@@ -45,7 +45,6 @@ function CollectionsPage() {
               <th className="text-left font-medium px-5 py-3 w-10">#</th>
               <th className="text-left font-medium px-5 py-3">Market</th>
               <th className="text-left font-medium px-5 py-3">Category</th>
-              <th className="text-left font-medium px-5 py-3">Provider</th>
               <th className="text-right font-medium px-5 py-3">Assets</th>
               <th className="text-right font-medium px-5 py-3">
                 <button className="inline-flex items-center gap-1 hover:text-foreground">Floor <ArrowUpDown className="h-3 w-3" /></button>
@@ -71,7 +70,6 @@ function CollectionsPage() {
                   </Link>
                 </td>
                 <td className="px-5 py-3.5 text-muted-foreground">{c.category}</td>
-                <td className="px-5 py-3.5 text-muted-foreground">{c.marketplace}</td>
                 <td className="px-5 py-3.5 text-right font-mono tabular-nums text-muted-foreground">{c.trackedAssets.toLocaleString()}</td>
                 <td className="px-5 py-3.5 text-right font-mono tabular-nums">{fmtUSD(c.floorPrice)}</td>
                 <td className="px-5 py-3.5 text-right"><ChangeBadge value={c.change24h} /></td>
