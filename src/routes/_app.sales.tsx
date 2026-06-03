@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { fmtUSD } from "@/lib/mock-data";
 import { TypeBadge } from "@/components/app/Badges";
 import { RelativeTime } from "@/components/app/RelativeTime";
@@ -15,12 +15,25 @@ type Filter = "All" | "NFT" | "RWA" | "Phygital";
 
 function SalesPage() {
   const [filter, setFilter] = useState<Filter>("All");
+  const [nftMarketFilter, setNftMarketFilter] = useState("all");
+  const [nftCollectionFilter, setNftCollectionFilter] = useState("all");
   const { data, loading, error } = useMarketSales(7);
+  const trackedNfts = useTrackedNftAssets();
   const allRows = data?.sales ?? [];
   const rows = allRows.filter((sale) => filter === "All" || saleType(sale) === filter);
   const usdRows = rows.filter((sale) => sale.currency === "USD");
   const total = usdRows.reduce((sum, sale) => sum + sale.salePrice, 0);
   const average = usdRows.length ? total / usdRows.length : 0;
+  const nftRows = useMemo(() => {
+    return trackedNfts.items.filter((nft) => {
+      if (!nft.active || !nft.asset) return false;
+      if (nftMarketFilter !== "all" && nft.market !== nftMarketFilter) return false;
+      if (nftCollectionFilter !== "all" && nft.asset.collection !== nftCollectionFilter) return false;
+      return true;
+    });
+  }, [trackedNfts.items, nftMarketFilter, nftCollectionFilter]);
+  const nftMarkets = useMemo(() => Array.from(new Set(trackedNfts.items.filter((nft) => nft.active && nft.asset).map((nft) => nft.market))).sort(), [trackedNfts.items]);
+  const nftCollections = useMemo(() => Array.from(new Set(trackedNfts.items.map((nft) => nft.asset?.collection).filter((value): value is string => Boolean(value)))).sort(), [trackedNfts.items]);
 
   return (
     <div className="space-y-6">
@@ -36,6 +49,18 @@ function SalesPage() {
       </div>
 
       <DataStatus data={data} error={error} loading={loading} />
+
+      <TrackedNftSalesPanel
+        nfts={nftRows}
+        loading={trackedNfts.loading}
+        error={trackedNfts.error}
+        markets={nftMarkets}
+        collections={nftCollections}
+        marketFilter={nftMarketFilter}
+        collectionFilter={nftCollectionFilter}
+        onMarketChange={setNftMarketFilter}
+        onCollectionChange={setNftCollectionFilter}
+      />
 
       <div className="flex items-center justify-between gap-3">
         <div className="flex gap-1 p-1 rounded-md bg-surface border border-border">
@@ -152,4 +177,143 @@ function Stat({ label, value }: { label: string; value: string }) {
       <div className="mt-1.5 text-2xl font-semibold font-mono tabular-nums">{value}</div>
     </div>
   );
+}
+
+
+type TrackedNftAsset = {
+  mint: string;
+  market: string;
+  label: string | null;
+  active: boolean;
+  last_fetched_at: string | null;
+  asset: {
+    mint: string;
+    market: string;
+    name: string | null;
+    image: string | null;
+    owner: string | null;
+    collection: string | null;
+    token_standard: string | null;
+    interface: string | null;
+    updated_at: string;
+  } | null;
+};
+
+function useTrackedNftAssets() {
+  const [items, setItems] = useState<TrackedNftAsset[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | undefined>();
+
+  useEffect(() => {
+    const controller = new AbortController();
+    async function load() {
+      setLoading(true);
+      setError(undefined);
+      try {
+        const response = await fetch("/api/nfts/tracked?active=true&fetched=true", { signal: controller.signal, headers: { accept: "application/json" } });
+        const payload = await response.json() as { nfts?: TrackedNftAsset[]; error?: string };
+        if (!response.ok) throw new Error(payload.error ?? "Unable to load tracked NFT assets");
+        setItems(payload.nfts ?? []);
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        setError(error instanceof Error ? error.message : "Unable to load tracked NFT assets");
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
+      }
+    }
+    void load();
+    return () => controller.abort();
+  }, []);
+
+  return { items, loading, error };
+}
+
+function TrackedNftSalesPanel({
+  nfts,
+  loading,
+  error,
+  markets,
+  collections,
+  marketFilter,
+  collectionFilter,
+  onMarketChange,
+  onCollectionChange,
+}: {
+  nfts: TrackedNftAsset[];
+  loading: boolean;
+  error?: string;
+  markets: string[];
+  collections: string[];
+  marketFilter: string;
+  collectionFilter: string;
+  onMarketChange: (value: string) => void;
+  onCollectionChange: (value: string) => void;
+}) {
+  return (
+    <div className="rounded-lg border border-border bg-card overflow-hidden">
+      <div className="flex flex-wrap items-start justify-between gap-4 p-5 border-b border-border">
+        <div>
+          <h2 className="text-sm font-semibold">Stored tracked NFT assets</h2>
+          <p className="text-xs text-muted-foreground mt-0.5">Fetched NFTs stored from the controlled Helius allowlist. No untracked mint or collection scan is shown here.</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <select value={marketFilter} onChange={(event) => onMarketChange(event.target.value)} className="h-9 rounded-md border border-border bg-surface px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring">
+            <option value="all">All markets</option>
+            {markets.map((market) => <option key={market} value={market}>{market}</option>)}
+          </select>
+          <select value={collectionFilter} onChange={(event) => onCollectionChange(event.target.value)} className="h-9 rounded-md border border-border bg-surface px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring">
+            <option value="all">All NFT collections</option>
+            {collections.map((collection) => <option key={collection} value={collection}>{shorten(collection, 18)}</option>)}
+          </select>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="p-5 text-sm text-muted-foreground">Loading stored tracked NFTs...</div>
+      ) : error ? (
+        <div className="p-5 text-sm text-destructive">{error}</div>
+      ) : nfts.length === 0 ? (
+        <div className="p-5 text-sm text-muted-foreground">No fetched tracked NFTs match the selected filters.</div>
+      ) : (
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border">
+              <th className="text-left font-medium px-5 py-3">NFT asset</th>
+              <th className="text-left font-medium px-5 py-3">Market</th>
+              <th className="text-left font-medium px-5 py-3">NFT collection</th>
+              <th className="text-left font-medium px-5 py-3">Owner</th>
+              <th className="text-left font-medium px-5 py-3">Standard</th>
+              <th className="text-right font-medium px-5 py-3">Last fetched</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border">
+            {nfts.map((nft) => (
+              <tr key={nft.mint} className="hover:bg-surface-raised/40 transition">
+                <td className="px-5 py-3">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    {nft.asset?.image ? <img src={nft.asset.image} alt="" className="h-9 w-9 rounded object-cover bg-muted" /> : <div className="h-9 w-9 rounded bg-muted" />}
+                    <div className="min-w-0">
+                      <div className="font-medium truncate">{nft.asset?.name ?? nft.label ?? "Stored NFT"}</div>
+                      <div className="text-[10px] text-muted-foreground font-mono truncate max-w-[240px]">{nft.mint}</div>
+                    </div>
+                  </div>
+                </td>
+                <td className="px-5 py-3 text-muted-foreground">{nft.market}</td>
+                <td className="px-5 py-3 text-muted-foreground font-mono text-xs">{nft.asset?.collection ? shorten(nft.asset.collection, 18) : "--"}</td>
+                <td className="px-5 py-3 text-muted-foreground font-mono text-xs">{nft.asset?.owner ? shorten(nft.asset.owner, 12) : "--"}</td>
+                <td className="px-5 py-3 text-muted-foreground">{nft.asset?.token_standard ?? nft.asset?.interface ?? "--"}</td>
+                <td className="px-5 py-3 text-right text-muted-foreground text-xs">{nft.last_fetched_at ? <RelativeTime iso={nft.last_fetched_at} /> : "Never"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
+function shorten(value: string, size: number) {
+  if (value.length <= size) return value;
+  const edge = Math.max(4, Math.floor((size - 1) / 2));
+  return `${value.slice(0, edge)}…${value.slice(-edge)}`;
 }
