@@ -2,6 +2,13 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowRight, Sparkles, TrendingUp, Layers, ShieldCheck, Activity } from "lucide-react";
 import { categories, fmtUSD, sales } from "@/lib/mock-data";
 
+const trackedPlatforms = [
+  { name: "Collector Crypt", market: "Phygital cards", refresh: "10 min refresh", sales: "150 NFT sales" },
+  { name: "Magic Eden", market: "NFT marketplaces", refresh: "10 min refresh", sales: "150 NFT sales" },
+  { name: "Tensor", market: "Solana NFTs", refresh: "10 min refresh", sales: "150 NFT sales" },
+  { name: "Helius / Solscan", market: "On-chain fallback", refresh: "10 min refresh", sales: "150 NFT sales" },
+];
+
 export const Route = createFileRoute("/")({
   component: Landing,
   head: () => ({
@@ -57,19 +64,40 @@ function Landing() {
             verified sales, pricing trends, and liquidity across trading cards,
             sports memorabilia, and phygital assets.
           </p>
-          <div className="mt-10 flex flex-col sm:flex-row gap-3">
-            <Link
-              to="/dashboard"
-              className="inline-flex items-center justify-center gap-2 h-11 px-6 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition"
-            >
-              Open Intelligence <ArrowRight className="h-4 w-4" />
-            </Link>
-            <Link
-              to="/collections"
-              className="inline-flex items-center justify-center gap-2 h-11 px-6 rounded-md border border-border bg-surface text-sm font-medium hover:bg-surface-raised transition"
-            >
-              Browse markets
-            </Link>
+          <div className="mt-10 max-w-3xl rounded-lg border border-border bg-card/70 overflow-hidden">
+            <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
+              <div>
+                <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Tracked platforms</div>
+                <div className="text-sm font-semibold">Provider coverage and refresh cadence</div>
+              </div>
+              <div className="hidden sm:flex items-center gap-1.5 text-xs text-success">
+                <span className="h-1.5 w-1.5 rounded-full bg-success animate-pulse" />
+                Live tracking
+              </div>
+            </div>
+            <div className="grid sm:grid-cols-2 gap-px bg-border">
+              {trackedPlatforms.map((platform) => (
+                <div key={platform.name} className="bg-card p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="font-semibold">{platform.name}</div>
+                      <div className="mt-0.5 text-xs text-muted-foreground">{platform.market}</div>
+                    </div>
+                    <span className="h-2 w-2 rounded-full bg-success shadow-[0_0_14px_oklch(0.68_0.16_145)]" />
+                  </div>
+                  <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
+                    <div className="rounded-md border border-border bg-surface px-3 py-2">
+                      <div className="text-muted-foreground">Refresh</div>
+                      <div className="mt-1 font-mono font-semibold">{platform.refresh}</div>
+                    </div>
+                    <div className="rounded-md border border-border bg-surface px-3 py-2">
+                      <div className="text-muted-foreground">Window</div>
+                      <div className="mt-1 font-mono font-semibold">{platform.sales}</div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </section>
