@@ -1,124 +1,189 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
-import { collections, sales, fmtUSDFull, fmtUSD } from "@/lib/mock-data";
-import { ChangeBadge, TypeBadge } from "@/components/app/Badges";
+import { useMemo, useState } from "react";
+import { collections, fmtUSD } from "@/lib/mock-data";
 import { RelativeTime } from "@/components/app/RelativeTime";
-import { ArrowLeft, Star, ExternalLink } from "lucide-react";
+import { useMarketSales } from "@/lib/market-data/use-market-sales";
+import type { MarketProvider, NormalizedSale, ProviderStatus } from "@/lib/market-data/types";
+import { ArrowLeft, ExternalLink } from "lucide-react";
 
 export const Route = createFileRoute("/_app/collections/$slug")({
-  component: CollectionDetail,
+  component: MarketDetail,
   loader: ({ params }) => {
-    const collection = collections.find((c) => c.slug === params.slug);
-    if (!collection) throw notFound();
-    return { collection };
+    const market = collections.find((c) => c.slug === params.slug);
+    if (!market) throw notFound();
+    return { market };
   },
   head: ({ loaderData }) => ({
-    meta: [{ title: `${loaderData?.collection.name ?? "Collection"} — Perp RWA` }],
+    meta: [{ title: `${loaderData?.market.name ?? "Market"} — Perp RWA` }],
   }),
   notFoundComponent: () => (
     <div className="text-center py-20">
-      <h2 className="text-lg font-semibold">Collection not found</h2>
-      <Link to="/collections" className="mt-3 inline-block text-sm text-primary">Back to collections</Link>
+      <h2 className="text-lg font-semibold">Market not found</h2>
+      <Link to="/collections" className="mt-3 inline-block text-sm text-primary">Back to markets</Link>
     </div>
   ),
 });
 
-function CollectionDetail() {
-  const { collection: c } = Route.useLoaderData();
-  const collectionSales = sales.filter((s) => s.collectionSlug === c.slug);
+type ProviderFilter = "all" | MarketProvider;
 
-  const stats = [
-    { l: "Reference Floor", v: fmtUSDFull(c.floorPrice), change: c.change24h },
-    { l: "Verified 24h Volume", v: fmtUSD(c.volume24h), change: 4.2 },
-    { l: "Verified 7d Volume", v: fmtUSD(c.volume7d), change: c.change7d },
-    { l: "Tracked Assets", v: c.trackedAssets.toLocaleString() },
-    { l: "Holders", v: c.owners.toLocaleString() },
-  ];
+type AssetRow = {
+  assetName: string;
+  assetImage?: string;
+  grade?: string;
+  lastSale?: NormalizedSale;
+  saleCount: number;
+  volumeUsd: number;
+  providers: string[];
+};
+
+const providerLabels: Record<MarketProvider, string> = {
+  "collector-crypt": "Collector Crypt",
+  "magic-eden": "Magic Eden",
+  tensor: "Tensor",
+  solscan: "Solscan",
+  helius: "Helius",
+  mock: "Mock",
+};
+
+function MarketDetail() {
+  const { market } = Route.useLoaderData();
+  const [provider, setProvider] = useState<ProviderFilter>("all");
+  const { data, loading, error } = useMarketSales(7);
+
+  const marketSales = useMemo(
+    () => (data?.sales ?? []).filter((sale) => sale.marketSlug === market.slug),
+    [data?.sales, market.slug],
+  );
+  const filteredSales = provider === "all" ? marketSales : marketSales.filter((sale) => sale.source === provider);
+  const assetRows = useMemo(() => buildAssetRows(filteredSales), [filteredSales]);
+  const usdVolume = filteredSales.filter((sale) => sale.currency === "USD").reduce((sum, sale) => sum + sale.salePrice, 0);
+  const trackedProviders = data?.providerStatus.map((status) => status.provider) ?? [];
+  const activeProviders = Array.from(new Set([...trackedProviders, ...marketSales.map((sale) => sale.source)]));
+  const providerOptions: ProviderFilter[] = ["all", ...activeProviders];
 
   return (
     <div className="space-y-6">
       <Link to="/collections" className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground">
-        <ArrowLeft className="h-3 w-3" /> Back to collections
+        <ArrowLeft className="h-3 w-3" /> Back to markets
       </Link>
 
-      <div className="flex flex-col sm:flex-row gap-5 items-start">
-        <img src={c.image} alt={c.name} className="h-24 w-24 rounded-xl object-cover bg-muted ring-1 ring-border" />
-        <div className="flex-1">
-          <div className="flex items-center gap-2 flex-wrap">
-            <TypeBadge type={c.type} />
-            <span className="text-xs text-muted-foreground">{c.category} · {c.series}</span>
+      <div className="flex flex-col lg:flex-row gap-5 items-start">
+        <img src={market.image} alt={market.name} className="h-24 w-24 rounded-xl object-cover bg-muted ring-1 ring-border" />
+        <div className="flex-1 min-w-0">
+          <div className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-3 py-1 text-xs text-muted-foreground">
+            <span className={`h-1.5 w-1.5 rounded-full ${data?.live ? "bg-success animate-pulse" : "bg-muted-foreground"}`} />
+            {data?.live ? "Live provider feed" : "Mock feed until providers are configured"}
           </div>
-          <h1 className="mt-2 text-2xl font-semibold tracking-tight">{c.name}</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Market intelligence from <span className="text-foreground">{c.marketplace}</span> and comparable sources. Mock data for now.
+          <h1 className="mt-3 text-2xl font-semibold tracking-tight">{market.name}</h1>
+          <p className="text-sm text-muted-foreground mt-1 max-w-2xl">
+            Track sold assets for this market across the providers we monitor. Rows are organized as market → asset → confirmed sale, with provider status and refresh cadence visible.
           </p>
         </div>
-        <div className="flex gap-2">
-          <button className="h-9 px-3 inline-flex items-center gap-1.5 rounded-md border border-border bg-surface text-sm hover:bg-surface-raised transition">
-            <Star className="h-3.5 w-3.5" /> Watch
-          </button>
-          <button className="h-9 px-3 inline-flex items-center gap-1.5 rounded-md border border-border bg-surface text-sm hover:bg-surface-raised transition">
-            <ExternalLink className="h-3.5 w-3.5" /> {c.marketplace}
-          </button>
+      </div>
+
+      <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-3">
+        <Stat label="7d confirmed sales" value={loading ? "..." : filteredSales.length.toString()} />
+        <Stat label="USD sale volume" value={loading ? "..." : fmtUSD(usdVolume)} />
+        <Stat label="Tracked providers" value={loading ? "..." : trackedProviders.length.toString()} />
+        <Stat label="Refresh cadence" value="10 min" />
+      </div>
+
+      <ProviderStatusPanel statuses={data?.providerStatus ?? []} loading={loading} error={error} live={Boolean(data?.live)} />
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap gap-1 p-1 rounded-md bg-surface border border-border">
+          {providerOptions.map((option) => (
+            <button
+              key={option}
+              onClick={() => setProvider(option)}
+              className={`text-xs px-3 py-1.5 rounded transition ${provider === option ? "bg-surface-raised text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              {option === "all" ? "All providers" : providerLabels[option] ?? option}
+            </button>
+          ))}
         </div>
+        <div className="text-xs text-muted-foreground font-mono">{assetRows.length} assets · {filteredSales.length} sales</div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-px bg-border border border-border rounded-lg overflow-hidden">
-        {stats.map((s) => (
-          <div key={s.l} className="bg-card p-4">
-            <div className="text-[11px] uppercase tracking-wider text-muted-foreground">{s.l}</div>
-            <div className="mt-1.5 flex items-baseline justify-between gap-2">
-              <span className="text-lg font-semibold font-mono tabular-nums">{s.v}</span>
-              {typeof s.change === "number" && <ChangeBadge value={s.change} />}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div className="rounded-lg border border-border bg-card">
-        <div className="flex items-center justify-between p-5 border-b border-border">
-          <div>
-            <h2 className="text-sm font-semibold">Reference pricing trend — last 30 days</h2>
-            <p className="text-xs text-muted-foreground mt-0.5">Mock trend based on representative assets in this collection</p>
-          </div>
-          <div className="flex gap-1">
-            {["7d", "30d", "90d", "All"].map((p, i) => (
-              <button key={p} className={`text-xs px-2.5 py-1 rounded ${i === 1 ? "bg-surface-raised text-foreground" : "text-muted-foreground hover:text-foreground"}`}>{p}</button>
-            ))}
-          </div>
-        </div>
-        <FloorChart seed={c.id} />
-      </div>
-
-      <div className="rounded-lg border border-border bg-card">
+      <div className="rounded-lg border border-border bg-card overflow-hidden">
         <div className="p-5 border-b border-border">
-          <h2 className="text-sm font-semibold">Verified sales — {c.name}</h2>
+          <h2 className="text-sm font-semibold">Sold assets — {market.name}</h2>
+          <p className="text-xs text-muted-foreground mt-0.5">Unique assets sold in the selected provider feed.</p>
         </div>
-        {collectionSales.length === 0 ? (
-          <div className="p-8 text-center text-sm text-muted-foreground">No recent sales for this collection.</div>
+        {loading ? (
+          <div className="p-8 text-sm text-muted-foreground">Loading market assets...</div>
+        ) : assetRows.length === 0 ? (
+          <div className="p-8 text-sm text-muted-foreground">No sold assets found for this market in the current 7-day window.</div>
         ) : (
           <table className="w-full text-sm">
             <thead>
               <tr className="text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border">
-                <th className="text-left font-medium px-5 py-2">Asset</th>
-                <th className="text-left font-medium px-5 py-2">Grade</th>
-                <th className="text-right font-medium px-5 py-2">Sale price</th>
-                <th className="text-right font-medium px-5 py-2">Change</th>
-                <th className="text-left font-medium px-5 py-2">Source</th>
-                <th className="text-right font-medium px-5 py-2">Time</th>
+                <th className="text-left font-medium px-5 py-3">Asset</th>
+                <th className="text-left font-medium px-5 py-3">Grade</th>
+                <th className="text-right font-medium px-5 py-3">Sales</th>
+                <th className="text-right font-medium px-5 py-3">Last sale</th>
+                <th className="text-left font-medium px-5 py-3">Providers</th>
+                <th className="text-right font-medium px-5 py-3">State</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {collectionSales.map((s) => (
-                <tr key={s.id} className="hover:bg-surface-raised/40 transition">
-                  <td className="px-5 py-3 flex items-center gap-2.5">
-                    <img src={s.image} alt="" className="h-8 w-8 rounded object-cover bg-muted" />
-                    <span className="font-medium">{s.asset}</span>
+              {assetRows.map((asset) => (
+                <tr key={asset.assetName} className="hover:bg-surface-raised/40 transition">
+                  <td className="px-5 py-3">
+                    <div className="flex items-center gap-2.5">
+                      {asset.assetImage ? <img src={asset.assetImage} alt="" className="h-9 w-9 rounded object-cover bg-muted" /> : <div className="h-9 w-9 rounded bg-muted" />}
+                      <span className="font-medium">{asset.assetName}</span>
+                    </div>
                   </td>
-                  <td className="px-5 py-3 text-muted-foreground">{s.grade}</td>
-                  <td className="text-right font-mono tabular-nums font-semibold px-5 py-3">{fmtUSD(s.price)}</td>
-                  <td className="text-right px-5 py-3"><ChangeBadge value={s.priceChange} /></td>
-                  <td className="px-5 py-3 text-muted-foreground">{s.marketplace}</td>
-                  <td className="text-right px-5 py-3 text-muted-foreground text-xs"><RelativeTime iso={s.time} /></td>
+                  <td className="px-5 py-3 text-muted-foreground">{asset.grade ?? "Verified"}</td>
+                  <td className="px-5 py-3 text-right font-mono tabular-nums">{asset.saleCount}</td>
+                  <td className="px-5 py-3 text-right font-mono tabular-nums font-semibold">{asset.lastSale ? formatSalePrice(asset.lastSale) : "-"}</td>
+                  <td className="px-5 py-3 text-muted-foreground">{asset.providers.join(", ")}</td>
+                  <td className="px-5 py-3 text-right"><AssetState sale={asset.lastSale} live={Boolean(data?.live)} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      <div className="rounded-lg border border-border bg-card overflow-hidden">
+        <div className="p-5 border-b border-border">
+          <h2 className="text-sm font-semibold">Confirmed sales feed</h2>
+          <p className="text-xs text-muted-foreground mt-0.5">Latest executed sales for this market, grouped by provider and marketplace source.</p>
+        </div>
+        {loading ? (
+          <div className="p-8 text-sm text-muted-foreground">Loading confirmed sales...</div>
+        ) : filteredSales.length === 0 ? (
+          <div className="p-8 text-sm text-muted-foreground">No confirmed sales for this provider filter.</div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border">
+                <th className="text-left font-medium px-5 py-3">Asset</th>
+                <th className="text-left font-medium px-5 py-3">Provider</th>
+                <th className="text-left font-medium px-5 py-3">Marketplace</th>
+                <th className="text-left font-medium px-5 py-3">Grade</th>
+                <th className="text-right font-medium px-5 py-3">Sale price</th>
+                <th className="text-right font-medium px-5 py-3">Time</th>
+                <th className="text-right font-medium px-5 py-3">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {filteredSales.map((sale) => (
+                <tr key={sale.id} className="hover:bg-surface-raised/40 transition">
+                  <td className="px-5 py-3">
+                    <div className="flex items-center gap-2.5">
+                      {sale.assetImage ? <img src={sale.assetImage} alt="" className="h-8 w-8 rounded object-cover bg-muted" /> : <div className="h-8 w-8 rounded bg-muted" />}
+                      <span className="font-medium">{sale.assetName}</span>
+                    </div>
+                  </td>
+                  <td className="px-5 py-3 text-muted-foreground">{providerLabels[sale.source] ?? sale.source}</td>
+                  <td className="px-5 py-3 text-muted-foreground">{sale.marketplace}</td>
+                  <td className="px-5 py-3 text-muted-foreground">{sale.grade ?? "Verified"}</td>
+                  <td className="px-5 py-3 text-right font-mono tabular-nums font-semibold">{formatSalePrice(sale)}</td>
+                  <td className="px-5 py-3 text-right text-muted-foreground text-xs"><RelativeTime iso={sale.saleTime} /></td>
+                  <td className="px-5 py-3 text-right"><SaleStatus sale={sale} /></td>
                 </tr>
               ))}
             </tbody>
@@ -129,34 +194,98 @@ function CollectionDetail() {
   );
 }
 
-function FloorChart({ seed }: { seed: string }) {
-  // Deterministic pseudo random based on seed
-  const rand = (i: number) => {
-    const x = Math.sin(parseInt(seed) * 9301 + i * 49297) * 233280;
-    return x - Math.floor(x);
-  };
-  const points = Array.from({ length: 30 }, (_, i) => 50 + rand(i) * 50 + Math.sin(i / 3) * 10);
-  const max = Math.max(...points), min = Math.min(...points);
-  const w = 800, h = 240, pad = 16;
-  const stepX = (w - pad * 2) / (points.length - 1);
-  const y = (v: number) => h - pad - ((v - min) / (max - min)) * (h - pad * 2);
-  const path = points.map((v, i) => `${i === 0 ? "M" : "L"} ${pad + i * stepX} ${y(v)}`).join(" ");
-  const area = `${path} L ${pad + (points.length - 1) * stepX} ${h - pad} L ${pad} ${h - pad} Z`;
+function buildAssetRows(rows: NormalizedSale[]): AssetRow[] {
+  const grouped = new Map<string, NormalizedSale[]>();
+  for (const sale of rows) {
+    const current = grouped.get(sale.assetName) ?? [];
+    current.push(sale);
+    grouped.set(sale.assetName, current);
+  }
+
+  return Array.from(grouped.entries()).map(([assetName, sales]) => {
+    const sorted = [...sales].sort((a, b) => new Date(b.saleTime).getTime() - new Date(a.saleTime).getTime());
+    const providers = Array.from(new Set(sorted.map((sale) => providerLabels[sale.source] ?? sale.source)));
+    return {
+      assetName,
+      assetImage: sorted.find((sale) => sale.assetImage)?.assetImage,
+      grade: sorted.find((sale) => sale.grade)?.grade,
+      lastSale: sorted[0],
+      saleCount: sorted.length,
+      volumeUsd: sorted.filter((sale) => sale.currency === "USD").reduce((sum, sale) => sum + sale.salePrice, 0),
+      providers,
+    };
+  }).sort((a, b) => new Date(b.lastSale?.saleTime ?? 0).getTime() - new Date(a.lastSale?.saleTime ?? 0).getTime());
+}
+
+function ProviderStatusPanel({ statuses, loading, error, live }: { statuses: ProviderStatus[]; loading: boolean; error?: string; live: boolean }) {
+  if (loading) return <div className="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">Loading provider status...</div>;
+  if (error) return <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">Market sales endpoint failed: {error}</div>;
+
   return (
-    <div className="p-5">
-      <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-56" preserveAspectRatio="none">
-        <defs>
-          <linearGradient id="cg" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="oklch(0.78 0.14 75)" stopOpacity="0.3" />
-            <stop offset="100%" stopColor="oklch(0.78 0.14 75)" stopOpacity="0" />
-          </linearGradient>
-        </defs>
-        {[0.25, 0.5, 0.75].map((p) => (
-          <line key={p} x1={pad} x2={w - pad} y1={pad + p * (h - pad * 2)} y2={pad + p * (h - pad * 2)} stroke="oklch(1 0 0 / 0.05)" strokeDasharray="2 4" />
-        ))}
-        <path d={area} fill="url(#cg)" />
-        <path d={path} fill="none" stroke="oklch(0.78 0.14 75)" strokeWidth="2" />
-      </svg>
+    <div className="rounded-lg border border-border bg-card p-4">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2 text-sm font-medium">
+            <span className={`h-2 w-2 rounded-full ${live ? "bg-success animate-pulse" : "bg-muted-foreground"}`} />
+            {live ? "Live provider tracking active" : "Provider tracking ready · currently using mock fallback"}
+          </div>
+          <div className="text-xs text-muted-foreground mt-1">Refresh cadence: 10 minutes · target window: 150 NFT sales per provider</div>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-2">
+          {statuses.map((status) => <ProviderPill key={status.provider} status={status} />)}
+        </div>
+      </div>
     </div>
   );
+}
+
+function ProviderPill({ status }: { status: ProviderStatus }) {
+  const label = providerLabels[status.provider] ?? status.provider;
+  const state = status.ok ? "Live" : status.enabled ? "Configured" : "Fallback";
+  const dotClass = status.ok ? "bg-success" : status.enabled ? "bg-primary" : "bg-muted-foreground";
+
+  return (
+    <span className="inline-flex min-w-[132px] items-center justify-between gap-2 rounded border border-border bg-surface px-2.5 py-1.5 text-[11px] text-muted-foreground" title={status.message}>
+      <span className="inline-flex items-center gap-1.5 truncate">
+        <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dotClass}`} />
+        <span className="truncate">{label}</span>
+      </span>
+      <span className="font-medium text-foreground">{state}</span>
+    </span>
+  );
+}
+
+function SaleStatus({ sale }: { sale: NormalizedSale }) {
+  const hasTx = Boolean(sale.txSignature || sale.sourceUrl);
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded border border-success/30 bg-success/10 px-2 py-1 text-[11px] text-success">
+      <span className="h-1.5 w-1.5 rounded-full bg-success" />
+      {hasTx ? "On-chain sale" : "Confirmed sale"}
+      {sale.sourceUrl && <a href={sale.sourceUrl} target="_blank" rel="noreferrer" className="hover:text-foreground"><ExternalLink className="h-3 w-3" /></a>}
+    </span>
+  );
+}
+
+function AssetState({ sale, live }: { sale?: NormalizedSale; live: boolean }) {
+  if (!sale) return <span className="text-xs text-muted-foreground">No sale</span>;
+  return (
+    <span className={`inline-flex items-center gap-1.5 rounded border px-2 py-1 text-[11px] ${live ? "border-success/30 bg-success/10 text-success" : "border-border bg-surface text-muted-foreground"}`}>
+      <span className={`h-1.5 w-1.5 rounded-full ${live ? "bg-success" : "bg-muted-foreground"}`} />
+      {live ? "Live" : "Mock"}
+    </span>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-border bg-card p-5">
+      <div className="text-xs text-muted-foreground">{label}</div>
+      <div className="mt-1.5 text-2xl font-semibold font-mono tabular-nums">{value}</div>
+    </div>
+  );
+}
+
+function formatSalePrice(sale: NormalizedSale): string {
+  if (sale.currency === "USD") return fmtUSD(sale.salePrice);
+  return `${sale.salePrice.toLocaleString("en-US", { maximumFractionDigits: 4 })} ${sale.currency}`;
 }
