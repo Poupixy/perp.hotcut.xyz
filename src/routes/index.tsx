@@ -66,7 +66,7 @@ function Landing() {
             verified sales, pricing trends, and liquidity across trading cards,
             sports memorabilia, and phygital assets.
           </p>
-          <div className="mt-10 max-w-3xl rounded-lg border border-border bg-card/70 overflow-hidden">
+          <div className="mt-10 w-full max-w-6xl rounded-lg border border-border bg-card/70 overflow-hidden">
             <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
               <div>
                 <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Tracked platforms</div>
@@ -77,20 +77,20 @@ function Landing() {
                 Magic Eden live
               </div>
             </div>
-            <div className="grid sm:grid-cols-2 gap-px bg-border">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-px bg-border">
               {trackedPlatforms.map((platform) => (
-                <div key={platform.name} className="bg-card p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <div className="font-semibold">{platform.name}</div>
-                      <div className="mt-0.5 text-xs text-muted-foreground">{platform.market}</div>
+                <div key={platform.name} className="bg-card p-4 min-w-0">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="font-semibold leading-tight">{platform.name}</div>
+                      <div className="mt-0.5 text-xs text-muted-foreground leading-snug">{platform.market}</div>
                     </div>
-                    <div className={`inline-flex items-center gap-1.5 rounded border px-2 py-1 text-[11px] ${platform.statusTone === "live" ? "border-success/30 bg-success/10 text-success" : platform.statusTone === "watching" ? "border-primary/30 bg-primary/10 text-primary" : "border-border bg-surface text-muted-foreground"}`}>
+                    <div className={`shrink-0 inline-flex items-center gap-1.5 rounded border px-2 py-1 text-[11px] ${platform.statusTone === "live" ? "border-success/30 bg-success/10 text-success" : platform.statusTone === "watching" ? "border-primary/30 bg-primary/10 text-primary" : "border-border bg-surface text-muted-foreground"}`}>
                       <span className={`h-1.5 w-1.5 rounded-full ${platform.statusTone === "live" ? "bg-success animate-pulse" : platform.statusTone === "watching" ? "bg-primary" : "bg-muted-foreground"}`} />
                       {platform.status}
                     </div>
                   </div>
-                  <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
+                  <div className="mt-4 grid grid-cols-1 min-[420px]:grid-cols-2 gap-2 text-xs">
                     <div className="rounded-md border border-border bg-surface px-3 py-2">
                       <div className="text-muted-foreground">Refresh</div>
                       <div className="mt-1 font-mono font-semibold">{platform.refresh}</div>
