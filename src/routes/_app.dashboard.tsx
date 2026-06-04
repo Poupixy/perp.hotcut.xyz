@@ -276,9 +276,11 @@ const NFT_MARKET_OPTIONS = [
   ["nba", "NBA"],
   ["nfl", "NFL"],
   ["nhl", "NHL"],
-  ["sealed_products", "Sealed Products"],
-  ["graded_cards", "Graded Cards"],
-  ["other_cards", "Other Cards"],
+  ["baseball", "Baseball"],
+  ["soccer", "Soccer"],
+  ["yugioh", "Yu-Gi-Oh"],
+  ["dragon_ball", "Dragon Ball"],
+  ["magic_the_gathering", "Magic The Gathering"],
 ] as const;
 
 function TrackedNftsPanel() {
@@ -415,7 +417,7 @@ function CollectionDiscoveryPanel({ onIngested }: { onIngested: () => Promise<vo
 
   async function postCollection(url: string, body: unknown) {
     const response = await fetch(url, { method: "POST", headers: { "content-type": "application/json", accept: "application/json" }, body: JSON.stringify(body) });
-    const payload = await response.json().catch(() => ({})) as { error?: string; assets?: CollectionPreviewAsset[]; total?: number | null; savedAssets?: number; assetsFound?: number };
+    const payload = await response.json().catch(() => ({})) as { error?: string; assets?: CollectionPreviewAsset[]; total?: number | null; savedAssets?: number; assetsFound?: number; skippedAssets?: number };
     if (!response.ok) throw new Error(payload.error ?? "Request failed");
     return payload;
   }
@@ -442,7 +444,7 @@ function CollectionDiscoveryPanel({ onIngested }: { onIngested: () => Promise<vo
     setMessage(null);
     try {
       const payload = await postCollection("/api/nfts/collections/ingest", { collectionAddress });
-      setMessage(`Collection saved: ${payload.savedAssets ?? 0} NFTs stored from ${payload.assetsFound ?? 0} assets found.`);
+      setMessage(`Collection saved: ${payload.savedAssets ?? 0} NFTs stored from ${payload.assetsFound ?? 0} assets found. ${payload.skippedAssets ?? 0} ignored outside tracked categories.`);
       await onIngested();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to ingest collection");

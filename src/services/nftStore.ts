@@ -172,7 +172,7 @@ export async function saveCollectionAssets(
     assetByMint.set(asset.mint, {
       id: stableId(asset.mint),
       mint: asset.mint,
-      market: collection.market,
+      market: asset.market,
       name: asset.name,
       description: asset.description,
       image: asset.image,
@@ -189,7 +189,7 @@ export async function saveCollectionAssets(
     trackedByMint.set(asset.mint, {
       id: existingTracked?.id ?? stableId(asset.mint),
       mint: asset.mint,
-      market: collection.market,
+      market: asset.market as TrackedNftMarket,
       label: existingTracked?.label ?? asset.name ?? collection.label,
       active: true,
       created_at: existingTracked?.created_at ?? timestamp,

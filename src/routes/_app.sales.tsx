@@ -188,9 +188,11 @@ const NFT_MARKET_OPTIONS = [
   ["nba", "NBA"],
   ["nfl", "NFL"],
   ["nhl", "NHL"],
-  ["sealed_products", "Sealed Products"],
-  ["graded_cards", "Graded Cards"],
-  ["other_cards", "Other Cards"],
+  ["baseball", "Baseball"],
+  ["soccer", "Soccer"],
+  ["yugioh", "Yu-Gi-Oh"],
+  ["dragon_ball", "Dragon Ball"],
+  ["magic_the_gathering", "Magic The Gathering"],
 ] as const;
 
 type NftIngestionStatus = {

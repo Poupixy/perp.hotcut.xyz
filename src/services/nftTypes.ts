@@ -76,5 +76,6 @@ export type CollectionIngestionResult = {
   pagesFetched: number;
   assetsFound: number;
   savedAssets: number;
+  skippedAssets: number;
   nextPage: number | null;
 };

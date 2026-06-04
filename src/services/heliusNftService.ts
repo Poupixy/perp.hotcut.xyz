@@ -1,5 +1,6 @@
 import type { CollectionIngestionResult, NormalizedNftAsset, TrackedNftRow } from "./nftTypes";
 import { readNftDb, saveCollectionAssets, saveNormalizedAsset, updateQueueState } from "./nftStore";
+import { filterAndSortTrackedAssets, getTrackedMarketCategory } from "./trackedMarketCategories";
 import { findAllowedNftCollection } from "./trackedNftsConfig";
 
 const HELIUS_RPC_URL = "https://mainnet.helius-rpc.com/";
@@ -155,6 +156,12 @@ export function normalizeHeliusAsset(asset: any, market = "other_cards"): Normal
   };
 }
 
+export function normalizeTrackedHeliusAsset(asset: any, fallbackMarket = "other_cards"): NormalizedNftAsset | null {
+  const normalized = normalizeHeliusAsset(asset, fallbackMarket);
+  const category = getTrackedMarketCategory(normalized.attributes);
+  return category ? { ...normalized, market: category.market } : null;
+}
+
 export async function getAssetsByCollection(collectionAddress: string, options: GetAssetsByCollectionOptions = {}): Promise<{ assets: unknown[]; pagesFetched: number; total: number | null }> {
   const allowedCollection = findAllowedNftCollection(collectionAddress);
   if (!allowedCollection) {
@@ -212,9 +219,15 @@ export async function fetchAndSaveAllowedCollection(collectionAddress: string, o
   if (!allowedCollection) throw new HeliusNftError("Collection is not allowlisted. Refusing to fetch unknown collection.");
 
   const { assets, pagesFetched } = await getAssetsByCollection(allowedCollection.collectionAddress, options);
-  const normalized = assets.map((asset) => normalizeHeliusAsset(asset, allowedCollection.market));
-  const saved = await saveCollectionAssets(allowedCollection, normalized, assets);
+  const pairs = assets
+    .map((asset) => ({ raw: asset, normalized: normalizeTrackedHeliusAsset(asset, allowedCollection.market) }))
+    .filter((item): item is { raw: unknown; normalized: NormalizedNftAsset } => Boolean(item.normalized));
+  const normalized = filterAndSortTrackedAssets(pairs.map((item) => item.normalized));
+  const rawByMint = new Map(pairs.map((item) => [item.normalized.mint, item.raw]));
+  const filteredRawAssets = normalized.map((asset) => rawByMint.get(asset.mint) ?? asset);
+  const saved = await saveCollectionAssets(allowedCollection, normalized, filteredRawAssets);
 
+  console.log(`[COLLECTION INGESTION] Skipped assets outside tracked categories: ${assets.length - normalized.length}`);
   console.log(`[COLLECTION INGESTION] Saved assets: ${saved.savedAssets}`);
 
   return {
@@ -224,6 +237,7 @@ export async function fetchAndSaveAllowedCollection(collectionAddress: string, o
     pagesFetched,
     assetsFound: assets.length,
     savedAssets: saved.savedAssets,
+    skippedAssets: assets.length - normalized.length,
     nextPage: null,
   };
 }

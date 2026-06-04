@@ -1,4 +1,17 @@
-export type TrackedNftMarket = "pokemon" | "one_piece" | "nba" | "nfl" | "nhl" | "sealed_products" | "graded_cards" | "other_cards";
+export type TrackedNftMarket =
+  | "pokemon"
+  | "one_piece"
+  | "nba"
+  | "nfl"
+  | "nhl"
+  | "baseball"
+  | "soccer"
+  | "yugioh"
+  | "dragon_ball"
+  | "magic_the_gathering"
+  | "sealed_products"
+  | "graded_cards"
+  | "other_cards";
 
 export type TargetNftConfig = {
   mint: string;
@@ -18,6 +31,11 @@ export const NFT_MARKETS: TrackedNftMarket[] = [
   "nba",
   "nfl",
   "nhl",
+  "baseball",
+  "soccer",
+  "yugioh",
+  "dragon_ball",
+  "magic_the_gathering",
   "sealed_products",
   "graded_cards",
   "other_cards",
