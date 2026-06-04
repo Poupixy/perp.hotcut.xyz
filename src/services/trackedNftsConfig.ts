@@ -1,17 +1,14 @@
 export type TrackedNftMarket =
   | "pokemon"
   | "one_piece"
-  | "nba"
-  | "nfl"
-  | "nhl"
+  | "basketball"
+  | "football"
+  | "hockey"
   | "baseball"
   | "soccer"
   | "yugioh"
   | "dragon_ball"
-  | "magic_the_gathering"
-  | "sealed_products"
-  | "graded_cards"
-  | "other_cards";
+  | "magic_the_gathering";
 
 export type TargetNftConfig = {
   mint: string;
@@ -28,9 +25,9 @@ export type TargetNftCollectionConfig = {
 export const NFT_MARKETS: TrackedNftMarket[] = [
   "pokemon",
   "one_piece",
-  "nba",
-  "nfl",
-  "nhl",
+  "basketball",
+  "football",
+  "hockey",
   "baseball",
   "soccer",
   "yugioh",
@@ -51,7 +48,7 @@ export const TARGET_NFTS: TargetNftConfig[] = [
   },
   {
     mint: "NFT_MINT_ADDRESS_3",
-    market: "nba",
+    market: "basketball",
     label: "NBA Card Example",
   },
 ];

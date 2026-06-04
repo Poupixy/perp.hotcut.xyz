@@ -4,9 +4,10 @@ export const Route = createFileRoute("/api/nfts/status")({
   server: {
     handlers: {
       GET: async () => {
-        const [{ readNftDb }, { getAllowedNftCollections }] = await Promise.all([
+        const [{ readNftDb }, { getAllowedNftCollections }, { nftDatabasePath }] = await Promise.all([
           import("@/services/nftStore"),
           import("@/services/trackedNftsConfig"),
+          import("@/services/nftSqliteDb"),
         ]);
         const db = await readNftDb();
         const allowedCollections = getAllowedNftCollections();
@@ -19,6 +20,12 @@ export const Route = createFileRoute("/api/nfts/status")({
           allowedCollectionCount: allowedCollections.length,
           allowedCollections,
           queue: db.queue_state,
+          database: {
+            ok: true,
+            path: nftDatabasePath(),
+            status: "ready",
+            persistenceMode: "sqlite",
+          },
         }, { headers: { "Cache-Control": "no-store" } });
       },
     },

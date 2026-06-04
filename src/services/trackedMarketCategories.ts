@@ -9,9 +9,9 @@ export type TrackedMarketCategory = {
 export const TRACKED_MARKET_CATEGORIES: TrackedMarketCategory[] = [
   { market: "pokemon", label: "Pokémon", aliases: ["pokemon", "pokémon", "pok�mon"] },
   { market: "one_piece", label: "One Piece", aliases: ["one piece"] },
-  { market: "nba", label: "NBA / Basketball", aliases: ["basketball", "nba"] },
-  { market: "nfl", label: "NFL / Football", aliases: ["football", "nfl"] },
-  { market: "nhl", label: "NHL / Hockey", aliases: ["hockey", "nhl"] },
+  { market: "basketball", label: "Basketball", aliases: ["basketball", "nba"] },
+  { market: "football", label: "Football", aliases: ["football", "nfl"] },
+  { market: "hockey", label: "Hockey", aliases: ["hockey", "nhl"] },
   { market: "baseball", label: "Baseball", aliases: ["baseball"] },
   { market: "soccer", label: "Soccer", aliases: ["soccer"] },
   { market: "yugioh", label: "Yu-Gi-Oh", aliases: ["yu-gi-oh!", "yu-gi-oh", "yu-gi-oh!", "yugioh"] },

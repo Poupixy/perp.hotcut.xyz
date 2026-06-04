@@ -168,7 +168,7 @@ function Landing() {
               <p className="mt-3 text-muted-foreground max-w-xl">Real collection addresses, supply, holder count, and filtered NFT coverage for the providers currently tracked.</p>
             </div>
             <Link
-              to="/sales"
+              to="/verified-sales"
               className="inline-flex items-center justify-center gap-2 h-10 px-4 rounded-md border border-border bg-surface text-sm font-medium hover:bg-surface-raised transition"
             >
               View sales <ArrowRight className="h-4 w-4" />

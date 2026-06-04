@@ -16,7 +16,7 @@ import {
 const nav = [
   { title: "Market Overview", url: "/dashboard", icon: LayoutDashboard },
   { title: "Markets", url: "/collections", icon: Layers },
-  { title: "Verified Sales", url: "/sales", icon: Activity },
+  { title: "Verified Sales", url: "/verified-sales", icon: Activity },
 ];
 
 export function AppSidebar() {

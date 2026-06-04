@@ -127,7 +127,7 @@ export async function getAssetByMint(mint: string): Promise<unknown> {
   return heliusRpc("getAsset", { id: mint }, "get-asset");
 }
 
-export function normalizeHeliusAsset(asset: any, market = "other_cards"): NormalizedNftAsset {
+export function normalizeHeliusAsset(asset: any, market = "pokemon"): NormalizedNftAsset {
   const record = asRecord(asset);
   const content = asRecord(record.content);
   const metadata = asRecord(content.metadata);
@@ -156,7 +156,7 @@ export function normalizeHeliusAsset(asset: any, market = "other_cards"): Normal
   };
 }
 
-export function normalizeTrackedHeliusAsset(asset: any, fallbackMarket = "other_cards"): NormalizedNftAsset | null {
+export function normalizeTrackedHeliusAsset(asset: any, fallbackMarket = "pokemon"): NormalizedNftAsset | null {
   const normalized = normalizeHeliusAsset(asset, fallbackMarket);
   const category = getTrackedMarketCategory(normalized.attributes);
   return category ? { ...normalized, market: category.market } : null;

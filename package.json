@@ -15,7 +15,11 @@
     "providers:status": "tsx src/lib/provider-ingestion/cli.ts status",
     "refresh:nfts": "tsx src/jobs/refreshTrackedNfts.ts",
     "test:nft-ingestion": "tsx src/jobs/testNftIngestion.ts",
-    "ingest:nft-collection": "tsx src/jobs/ingestNftCollection.ts"
+    "ingest:nft-collection": "tsx src/jobs/ingestNftCollection.ts",
+    "migrate:nft-json": "tsx scripts/migrate-nft-json-to-db.ts",
+    "validate:nft-db": "tsx scripts/validate-nft-db.ts",
+    "validate:rwa-market": "tsx scripts/validate-rwa-market-tracking.ts",
+    "refresh:rwa-market": "tsx src/jobs/refreshRwaNftMarketData.ts"
   },
   "dependencies": {
     "@cloudflare/vite-plugin": "^1.25.5",

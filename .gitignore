@@ -12,6 +12,8 @@ dist
 dist-ssr
 data/*.json
 data/*.lock
+data/*.sqlite
+data/*.sqlite-*
 !data/.gitkeep
 .output
 .vinxi

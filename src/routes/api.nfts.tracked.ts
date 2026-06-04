@@ -19,7 +19,10 @@ export const Route = createFileRoute("/api/nfts/tracked")({
         if (approvedOnly) {
           const allowedMarkets = new Set<string>(NFT_MARKETS);
           const allowedCollections = new Set(getAllowedNftCollections().map((collection) => collection.collectionAddress));
-          nfts = nfts.filter((nft) => allowedMarkets.has(nft.market) && (!nft.asset?.collection || allowedCollections.has(nft.asset.collection)));
+          nfts = nfts.filter((nft) => {
+            const collectionAddress = nft.asset?.source_collection ?? nft.asset?.collection;
+            return allowedMarkets.has(nft.market) && (!collectionAddress || allowedCollections.has(collectionAddress));
+          });
         }
         if (market && market !== "all") nfts = nfts.filter((nft) => nft.market === market);
         if (collection && collection !== "all") nfts = nfts.filter((nft) => nft.asset?.collection === collection);

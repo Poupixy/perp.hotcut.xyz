@@ -128,7 +128,7 @@ function Dashboard() {
         <div className="rounded-lg border border-border bg-card">
           <div className="flex items-center justify-between p-5 border-b border-border">
             <h2 className="text-sm font-semibold">Latest verified sales</h2>
-            <Link to="/sales" className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1">
+            <Link to="/verified-sales" className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1">
               View all <ArrowUpRight className="h-3 w-3" />
             </Link>
           </div>
@@ -259,9 +259,9 @@ type CollectionPreviewAsset = {
 const NFT_MARKET_OPTIONS = [
   ["pokemon", "Pokémon"],
   ["one_piece", "One Piece"],
-  ["nba", "NBA"],
-  ["nfl", "NFL"],
-  ["nhl", "NHL"],
+  ["basketball", "Basketball"],
+  ["football", "Football"],
+  ["hockey", "Hockey"],
   ["baseball", "Baseball"],
   ["soccer", "Soccer"],
   ["yugioh", "Yu-Gi-Oh"],
@@ -403,7 +403,7 @@ function CollectionDiscoveryPanel({ onIngested }: { onIngested: () => Promise<vo
 
   async function postCollection(url: string, body: unknown) {
     const response = await fetch(url, { method: "POST", headers: { "content-type": "application/json", accept: "application/json" }, body: JSON.stringify(body) });
-    const payload = await response.json().catch(() => ({})) as { error?: string; assets?: CollectionPreviewAsset[]; total?: number | null; savedAssets?: number; assetsFound?: number; skippedAssets?: number };
+    const payload = await response.json().catch(() => ({})) as { error?: string; assets?: CollectionPreviewAsset[]; total?: number | null; savedAssets?: number; assetsFound?: number; skippedAssets?: number; status?: string; queued?: number };
     if (!response.ok) throw new Error(payload.error ?? "Request failed");
     return payload;
   }
@@ -430,7 +430,9 @@ function CollectionDiscoveryPanel({ onIngested }: { onIngested: () => Promise<vo
     setMessage(null);
     try {
       const payload = await postCollection("/api/nfts/collections/ingest", { collectionAddress });
-      setMessage(`Collection saved: ${payload.savedAssets ?? 0} NFTs stored from ${payload.assetsFound ?? 0} assets found. ${payload.skippedAssets ?? 0} ignored outside tracked categories.`);
+      setMessage(payload.status === "queued"
+        ? `Collection ingestion queued. Queue size: ${payload.queued ?? 0}.`
+        : `Collection saved: ${payload.savedAssets ?? 0} NFTs stored from ${payload.assetsFound ?? 0} assets found. ${payload.skippedAssets ?? 0} ignored outside tracked categories.`);
       await onIngested();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to ingest collection");
