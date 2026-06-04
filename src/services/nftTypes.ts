@@ -67,3 +67,14 @@ export type RefreshResult = {
   asset?: NftAssetRow | null;
   retryAfterMs?: number;
 };
+
+
+export type CollectionIngestionResult = {
+  collectionAddress: string;
+  market: string;
+  label: string;
+  pagesFetched: number;
+  assetsFound: number;
+  savedAssets: number;
+  nextPage: number | null;
+};

@@ -1,6 +1,6 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
-import { TARGET_NFTS, isPlaceholderMint, isValidMarket, type TrackedNftMarket } from "./trackedNftsConfig";
+import { TARGET_NFTS, isPlaceholderMint, isValidMarket, type TargetNftCollectionConfig, type TrackedNftMarket } from "./trackedNftsConfig";
 import type { NftAssetRow, NftIngestionDb, NormalizedNftAsset, TrackedNftRow, TrackedNftWithAsset } from "./nftTypes";
 
 const EMPTY_QUEUE = { queue: [], processing: false, lastHeliusCallAt: null, backoffUntil: null, updatedAt: null };
@@ -147,6 +147,64 @@ export async function saveNormalizedAsset(trackedNft: TrackedNftRow, asset: Norm
   const tracked = db.tracked_nfts.map((item) => item.mint === trackedNft.mint ? { ...item, last_fetched_at: timestamp, updated_at: timestamp } : item);
   await writeNftDb({ ...db, tracked_nfts: tracked, nft_assets: [...assets, row] });
   return row;
+}
+
+export async function saveCollectionAssets(
+  collection: TargetNftCollectionConfig,
+  assets: NormalizedNftAsset[],
+  rawAssets: unknown[],
+): Promise<{ savedAssets: number; totalAssets: number }> {
+  const db = await readNftDb();
+  const timestamp = nowIso();
+  const rawByMint = new Map<string, unknown>();
+  rawAssets.forEach((raw, index) => {
+    const mint = assets[index]?.mint;
+    if (mint) rawByMint.set(mint, raw);
+  });
+
+  const assetByMint = new Map(db.nft_assets.map((asset) => [asset.mint, asset]));
+  const trackedByMint = new Map(db.tracked_nfts.map((tracked) => [tracked.mint, tracked]));
+  let savedAssets = 0;
+
+  for (const asset of assets) {
+    if (!asset.mint) continue;
+    savedAssets += 1;
+    assetByMint.set(asset.mint, {
+      id: stableId(asset.mint),
+      mint: asset.mint,
+      market: collection.market,
+      name: asset.name,
+      description: asset.description,
+      image: asset.image,
+      owner: asset.owner,
+      collection: asset.collection ?? collection.collectionAddress,
+      attributes_json: asset.attributes,
+      token_standard: asset.tokenStandard,
+      interface: asset.interface,
+      raw_helius_json: rawByMint.get(asset.mint) ?? asset,
+      updated_at: asset.updatedAt || timestamp,
+    });
+
+    const existingTracked = trackedByMint.get(asset.mint);
+    trackedByMint.set(asset.mint, {
+      id: existingTracked?.id ?? stableId(asset.mint),
+      mint: asset.mint,
+      market: collection.market,
+      label: existingTracked?.label ?? asset.name ?? collection.label,
+      active: true,
+      created_at: existingTracked?.created_at ?? timestamp,
+      updated_at: timestamp,
+      last_fetched_at: asset.updatedAt || timestamp,
+    });
+  }
+
+  await writeNftDb({
+    ...db,
+    tracked_nfts: Array.from(trackedByMint.values()),
+    nft_assets: Array.from(assetByMint.values()),
+  });
+
+  return { savedAssets, totalAssets: assets.length };
 }
 
 export async function getStoredAsset(mintInput: string): Promise<NftAssetRow | null> {
