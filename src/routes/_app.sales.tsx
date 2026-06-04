@@ -1,49 +1,45 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { fmtUSD } from "@/lib/real-market-data";
-import { TypeBadge } from "@/components/app/Badges";
+import { fmtUSD, isApprovedMarketSlug, realProviderCollections } from "@/lib/real-market-data";
 import { RelativeTime } from "@/components/app/RelativeTime";
 import { useMarketSales } from "@/lib/market-data/use-market-sales";
 import type { NormalizedSale } from "@/lib/market-data/types";
+import { trackedMarketLabel } from "@/services/trackedMarketCategories";
 
 export const Route = createFileRoute("/_app/sales")({
   component: SalesPage,
   head: () => ({ meta: [{ title: "Verified Sales — Perp RWA" }] }),
 });
 
-type Filter = "All" | "NFT" | "RWA" | "Phygital";
-
 function SalesPage() {
-  const [filter, setFilter] = useState<Filter>("All");
   const [nftMarketFilter, setNftMarketFilter] = useState("all");
   const [nftCollectionFilter, setNftCollectionFilter] = useState("all");
   const { data, loading, error } = useMarketSales(7);
   const trackedNfts = useTrackedNftAssets();
-  const allRows = data?.sales ?? [];
-  const rows = allRows.filter((sale) => filter === "All" || saleType(sale) === filter);
+  const rows = (data?.sales ?? []).filter((sale) => isApprovedMarketSlug(sale.marketSlug));
   const usdRows = rows.filter((sale) => sale.currency === "USD");
   const total = usdRows.reduce((sum, sale) => sum + sale.salePrice, 0);
   const average = usdRows.length ? total / usdRows.length : 0;
   const nftRows = useMemo(() => {
     return trackedNfts.items.filter((nft) => {
-      if (!nft.active) return false;
+      if (!isApprovedTrackedNft(nft)) return false;
       if (nftMarketFilter !== "all" && nft.market !== nftMarketFilter) return false;
       if (nftCollectionFilter !== "all" && nft.asset?.collection !== nftCollectionFilter) return false;
       return true;
     });
   }, [trackedNfts.items, nftMarketFilter, nftCollectionFilter]);
-  const nftMarkets = useMemo(() => Array.from(new Set(trackedNfts.items.filter((nft) => nft.active).map((nft) => nft.market))).sort(), [trackedNfts.items]);
-  const nftCollections = useMemo(() => Array.from(new Set(trackedNfts.items.map((nft) => nft.asset?.collection).filter((value): value is string => Boolean(value)))).sort(), [trackedNfts.items]);
+  const nftMarkets = useMemo(() => Array.from(new Set(trackedNfts.items.filter(isApprovedTrackedNft).map((nft) => nft.market))).sort(), [trackedNfts.items]);
+  const nftCollections = useMemo(() => Array.from(new Set(trackedNfts.items.filter(isApprovedTrackedNft).map((nft) => nft.asset?.collection).filter((value): value is string => Boolean(value)))).sort(), [trackedNfts.items]);
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Verified Sales</h1>
-        <p className="text-sm text-muted-foreground mt-1">7-day asset-level sales across tracked markets, with provider, marketplace, timestamp, and source status.</p>
+        <p className="text-sm text-muted-foreground mt-1">Approved 7-day sales only: Pokémon, One Piece, NBA, NFL, NHL, Baseball, Soccer, Yu-Gi-Oh, Dragon Ball, and Magic The Gathering.</p>
       </div>
 
       <div className="grid grid-cols-3 gap-4">
-        <Stat label="7d sales" value={loading ? "..." : rows.length.toString()} />
+        <Stat label="Approved 7d sales" value={loading ? "..." : rows.length.toString()} />
         <Stat label="USD volume" value={loading ? "..." : fmtUSD(total)} />
         <Stat label="Average USD sale" value={loading ? "..." : fmtUSD(average)} />
       </div>
@@ -64,20 +60,6 @@ function SalesPage() {
         onReload={trackedNfts.load}
       />
 
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex gap-1 p-1 rounded-md bg-surface border border-border">
-          {(["All", "NFT", "RWA", "Phygital"] as Filter[]).map((f) => (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`text-xs px-3 py-1.5 rounded transition ${filter === f ? "bg-surface-raised text-foreground" : "text-muted-foreground hover:text-foreground"}`}
-            >
-              {f}
-            </button>
-          ))}
-        </div>
-      </div>
-
       <div className="rounded-lg border border-border bg-card overflow-hidden">
         <table className="w-full text-sm">
           <thead>
@@ -85,7 +67,6 @@ function SalesPage() {
               <th className="text-left font-medium px-5 py-3">Asset</th>
               <th className="text-left font-medium px-5 py-3">Market</th>
               <th className="text-left font-medium px-5 py-3">Grade</th>
-              <th className="text-left font-medium px-5 py-3">Type</th>
               <th className="text-right font-medium px-5 py-3">Sale price</th>
               <th className="text-right font-medium px-5 py-3">Provider</th>
               <th className="text-left font-medium px-5 py-3">Marketplace</th>
@@ -93,7 +74,9 @@ function SalesPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
-            {rows.map((s) => (
+            {rows.length === 0 && !loading ? (
+              <tr><td colSpan={7} className="px-5 py-8 text-sm text-muted-foreground">No approved confirmed sales in the current 7-day window. Non-approved provider rows are hidden.</td></tr>
+            ) : rows.map((s) => (
               <tr key={s.id} className="hover:bg-surface-raised/40 transition">
                 <td className="px-5 py-3">
                   <div className="flex items-center gap-2.5">
@@ -103,7 +86,6 @@ function SalesPage() {
                 </td>
                 <td className="px-5 py-3 text-muted-foreground">{s.marketName}</td>
                 <td className="px-5 py-3 text-muted-foreground">{s.grade ?? "Verified"}</td>
-                <td className="px-5 py-3"><TypeBadge type={saleType(s)} /></td>
                 <td className="px-5 py-3 text-right font-mono tabular-nums font-semibold">{formatSalePrice(s)}</td>
                 <td className="px-5 py-3 text-right text-muted-foreground">{s.source}</td>
                 <td className="px-5 py-3 text-muted-foreground">{s.marketplace}</td>
@@ -115,11 +97,6 @@ function SalesPage() {
       </div>
     </div>
   );
-}
-
-function saleType(sale: NormalizedSale): "NFT" | "RWA" | "Phygital" {
-  if (["nba-topshot-rare", "nfl-all-day", "nhl-topshot", "nba-cards", "nfl-cards", "nhl-cards"].includes(sale.marketSlug)) return "NFT";
-  return "Phygital";
 }
 
 function formatSalePrice(sale: NormalizedSale): string {
@@ -195,6 +172,9 @@ const NFT_MARKET_OPTIONS = [
   ["magic_the_gathering", "Magic The Gathering"],
 ] as const;
 
+const APPROVED_NFT_MARKETS = new Set<string>(NFT_MARKET_OPTIONS.map(([value]) => value));
+const ALLOWED_NFT_COLLECTIONS = new Set(realProviderCollections.map((collection) => collection.address));
+
 type NftIngestionStatus = {
   heliusConfigured: boolean;
   trackedCount: number;
@@ -222,6 +202,12 @@ type TrackedNftAsset = {
   } | null;
 };
 
+function isApprovedTrackedNft(nft: TrackedNftAsset) {
+  if (!nft.active || !APPROVED_NFT_MARKETS.has(nft.market)) return false;
+  if (!nft.asset) return false;
+  return Boolean(nft.asset.collection && ALLOWED_NFT_COLLECTIONS.has(nft.asset.collection));
+}
+
 function useTrackedNftAssets() {
   const [items, setItems] = useState<TrackedNftAsset[]>([]);
   const [loading, setLoading] = useState(true);
@@ -233,7 +219,7 @@ function useTrackedNftAssets() {
       setError(undefined);
       try {
         const [trackedResponse, statusResponse] = await Promise.all([
-          fetch("/api/nfts/tracked?active=true&fetched=false", { signal, headers: { accept: "application/json" } }),
+          fetch("/api/nfts/tracked?active=true&fetched=true&approved=true", { signal, headers: { accept: "application/json" } }),
           fetch("/api/nfts/status", { signal, headers: { accept: "application/json" } }),
         ]);
         const payload = await trackedResponse.json() as { nfts?: TrackedNftAsset[]; error?: string };
@@ -332,8 +318,8 @@ function TrackedNftSalesPanel({
     <div className="rounded-lg border border-border bg-card overflow-hidden">
       <div className="flex flex-wrap items-start justify-between gap-4 p-5 border-b border-border">
         <div>
-          <h2 className="text-sm font-semibold">Stored tracked NFT assets</h2>
-          <p className="text-xs text-muted-foreground mt-0.5">NFTs stored from the controlled Helius allowlist. Pending tracked NFTs stay visible until they are fetched.</p>
+          <h2 className="text-sm font-semibold">Approved tracked NFT assets</h2>
+          <p className="text-xs text-muted-foreground mt-0.5">Only fetched NFTs from approved markets and allowlisted provider collections are shown here.</p>
           <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-muted-foreground">
             <span className={`rounded border px-2 py-1 ${status?.heliusConfigured ? "border-success/30 bg-success/10 text-success" : "border-danger/30 bg-danger/10 text-danger"}`}>Helius {status?.heliusConfigured ? "configured" : "missing key"}</span>
             <span className="rounded border border-border bg-surface px-2 py-1">Tracked {status?.activeTrackedCount ?? 0}</span>
@@ -343,7 +329,7 @@ function TrackedNftSalesPanel({
         <div className="flex flex-wrap gap-2">
           <select value={marketFilter} onChange={(event) => onMarketChange(event.target.value)} className="h-9 rounded-md border border-border bg-surface px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring">
             <option value="all">All markets</option>
-            {markets.map((market) => <option key={market} value={market}>{market}</option>)}
+            {markets.map((market) => <option key={market} value={market}>{trackedMarketLabel(market)}</option>)}
           </select>
           <select value={collectionFilter} onChange={(event) => onCollectionChange(event.target.value)} className="h-9 rounded-md border border-border bg-surface px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring">
             <option value="all">All NFT collections</option>
@@ -366,7 +352,7 @@ function TrackedNftSalesPanel({
         </div>
         <div className="bg-card p-5 text-xs text-muted-foreground leading-relaxed">
           <div className="font-medium text-foreground">Filtrage strict</div>
-          <p className="mt-1">Seuls les mints ajoutés ici ou présents dans TARGET_NFTS sont récupérables. Aucun scan de collection et aucun NFT aléatoire.</p>
+          <p className="mt-1">Seuls les mints des marchés approuvés et des collections allowlistées Collector Crypt / Phygitals sont affichés ici. Les autres données provider sont masquées.</p>
           {!status?.heliusConfigured && <p className="mt-2 text-danger">HELIUS_API_KEY n’est pas configurée dans le conteneur, donc les NFTs suivis resteront en attente jusqu’à configuration.</p>}
         </div>
       </div>
@@ -376,7 +362,7 @@ function TrackedNftSalesPanel({
       ) : error ? (
         <div className="p-5 text-sm text-destructive">{error}</div>
       ) : nfts.length === 0 ? (
-        <div className="p-5 text-sm text-muted-foreground">No fetched tracked NFTs match the selected filters.</div>
+        <div className="p-5 text-sm text-muted-foreground">No approved fetched NFTs match the selected filters.</div>
       ) : (
         <table className="w-full text-sm">
           <thead>
@@ -401,7 +387,7 @@ function TrackedNftSalesPanel({
                     </div>
                   </div>
                 </td>
-                <td className="px-5 py-3 text-muted-foreground">{nft.market}</td>
+                <td className="px-5 py-3 text-muted-foreground">{trackedMarketLabel(nft.market)}</td>
                 <td className="px-5 py-3 text-muted-foreground font-mono text-xs">{nft.asset?.collection ? shorten(nft.asset.collection, 18) : "--"}</td>
                 <td className="px-5 py-3 text-muted-foreground font-mono text-xs">{nft.asset?.owner ? shorten(nft.asset.owner, 12) : "--"}</td>
                 <td className="px-5 py-3 text-muted-foreground">{nft.asset?.token_standard ?? nft.asset?.interface ?? "Pending"}</td>

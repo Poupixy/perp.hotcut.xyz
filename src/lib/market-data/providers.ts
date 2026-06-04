@@ -1,3 +1,4 @@
+import { isApprovedMarketSlug } from "@/lib/real-market-data";
 import { MARKET_NAMES, getRuntimeEnv, readMarketSourceConfig } from "./config";
 import type { MarketProvider, MarketSalesResponse, MarketSourceConfig, NormalizedSale, ProviderStatus } from "./types";
 
@@ -71,7 +72,9 @@ async function fetchJson(url: string, init?: RequestInit): Promise<unknown> {
 }
 
 function marketsFromConfig(config: Record<string, MarketSourceConfig>) {
-  return Object.entries(config).map(([slug, marketConfig]) => ({ slug, name: MARKET_NAMES[slug] ?? slug, config: marketConfig ?? {} }));
+  return Object.entries(config)
+    .filter(([slug]) => isApprovedMarketSlug(slug))
+    .map(([slug, marketConfig]) => ({ slug, name: MARKET_NAMES[slug] ?? slug, config: marketConfig ?? {} }));
 }
 
 function extractMagicEdenSale(item: unknown, marketSlug: string, symbol: string): NormalizedSale | undefined {
@@ -136,7 +139,7 @@ async function fetchMagicEdenSales(window: FetchWindow, config: Record<string, M
     }
   }
 
-  return { sales, warnings, status: { provider: "magic-eden", enabled: true, ok: warnings.length === 0 || sales.length > 0, message: sales.length ? `${sales.length} sale(s) fetched.` : "Configured, but no recent sales returned." } };
+  return { sales, warnings, status: { provider: "magic-eden", enabled: true, ok: sales.length > 0, message: sales.length ? `${sales.length} sale(s) fetched.` : "Configured, but no recent sales returned." } };
 }
 
 function extractSolscanSale(item: unknown, marketSlug: string): NormalizedSale | undefined {
@@ -196,7 +199,7 @@ async function fetchSolscanSales(window: FetchWindow, config: Record<string, Mar
     }
   }
 
-  return { sales, warnings, status: { provider: "solscan", enabled: true, ok: warnings.length === 0 || sales.length > 0, message: sales.length ? `${sales.length} sale(s) fetched.` : "Configured, but no recent sales returned." } };
+  return { sales, warnings, status: { provider: "solscan", enabled: true, ok: sales.length > 0, message: sales.length ? `${sales.length} sale(s) fetched.` : "Configured, but no recent sales returned." } };
 }
 
 export async function fetchMarketSales(days: number): Promise<MarketSalesResponse> {
@@ -205,6 +208,7 @@ export async function fetchMarketSales(days: number): Promise<MarketSalesRespons
   const window = { from, to };
   const config = readMarketSourceConfig();
   const [magicEden, solscan] = await Promise.all([fetchMagicEdenSales(window, config), fetchSolscanSales(window, config)]);
+  const ignoredConfiguredMarkets = Object.keys(config).filter((slug) => !isApprovedMarketSlug(slug));
   const providerStatus: ProviderStatus[] = [
     magicEden.status,
     { provider: "tensor", enabled: Boolean(getRuntimeEnv().TENSOR_API_KEY), ok: false, message: "Tensor sales ingestion is prepared but not enabled until API access is confirmed." },
@@ -222,6 +226,10 @@ export async function fetchMarketSales(days: number): Promise<MarketSalesRespons
     live: liveSales.length > 0,
     sales: liveSales.sort((a, b) => new Date(b.saleTime).getTime() - new Date(a.saleTime).getTime()),
     providerStatus,
-    warnings: [...(magicEden.warnings ?? []), ...(solscan.warnings ?? [])],
+    warnings: [
+      ...(magicEden.warnings ?? []),
+      ...(solscan.warnings ?? []),
+      ...(ignoredConfiguredMarkets.length ? ["Ignored non-approved market sources: " + ignoredConfiguredMarkets.join(", ")] : []),
+    ],
   };
 }

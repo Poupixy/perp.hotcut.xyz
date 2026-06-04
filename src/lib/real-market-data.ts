@@ -39,6 +39,12 @@ export const realMarketCategories: RealMarketCategory[] = [
   { slug: "magic-the-gathering-cards", name: "Magic The Gathering", shortName: "MTG", collectorCryptAssets: 328, phygitalsAssets: 26 },
 ].map((category) => ({ ...category, assets: category.collectorCryptAssets + category.phygitalsAssets }));
 
+export const approvedMarketSlugs = new Set(realMarketCategories.map((category) => category.slug));
+
+export function isApprovedMarketSlug(slug: string) {
+  return approvedMarketSlugs.has(slug);
+}
+
 export const realProviderCollections: RealProviderCollection[] = [
   {
     id: "collector-crypt",

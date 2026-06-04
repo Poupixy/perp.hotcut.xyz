@@ -36,9 +36,6 @@ export const NFT_MARKETS: TrackedNftMarket[] = [
   "yugioh",
   "dragon_ball",
   "magic_the_gathering",
-  "sealed_products",
-  "graded_cards",
-  "other_cards",
 ];
 
 export const TARGET_NFTS: TargetNftConfig[] = [
@@ -115,10 +112,10 @@ function collectionsFromEnv(envKey: string, label: string, defaultMarket: Tracke
 export function getAllowedNftCollections(): TargetNftCollectionConfig[] {
   const byAddress = new Map<string, TargetNftCollectionConfig>();
   const envCollections = [
-    ...collectionsFromEnv("COLLECTOR_CRYPT_COLLECTION_ADDRESSES", "Collector Crypt", "graded_cards"),
-    ...collectionsFromEnv("PHYGITALS_COLLECTION_ADDRESSES", "Phygitals", "other_cards"),
-    ...collectionsFromEnv("BEEZIE_COLLECTION_ADDRESSES", "Beezie", "other_cards"),
-    ...collectionsFromEnv("NFT_COLLECTION_ADDRESSES", "Allowlisted collection", "other_cards"),
+    ...collectionsFromEnv("COLLECTOR_CRYPT_COLLECTION_ADDRESSES", "Collector Crypt", "pokemon"),
+    ...collectionsFromEnv("PHYGITALS_COLLECTION_ADDRESSES", "Phygitals", "pokemon"),
+    ...collectionsFromEnv("BEEZIE_COLLECTION_ADDRESSES", "Beezie", "pokemon"),
+    ...collectionsFromEnv("NFT_COLLECTION_ADDRESSES", "Allowlisted collection", "pokemon"),
   ];
 
   for (const item of [...ALLOWED_NFT_COLLECTIONS, ...envCollections]) {
