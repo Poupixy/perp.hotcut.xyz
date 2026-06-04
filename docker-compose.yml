@@ -8,6 +8,7 @@ services:
       - TENSOR_API_KEY=${TENSOR_API_KEY:-}
       - SOLSCAN_API_KEY=${SOLSCAN_API_KEY:-}
       - HELIUS_API_KEY=${HELIUS_API_KEY:-}
+      - PHYGITALS_COLLECTION_ADDRESSES=${PHYGITALS_COLLECTION_ADDRESSES:-}
       - PERP_MARKET_SOURCES=${PERP_MARKET_SOURCES:-{"pokemon-cards":{"magicEdenSymbols":["dark_machoke_team_rocket_1st_edition","2025_pokemon_pfl_enphantasmal_flames"]},"nfl-cards":{"magicEdenSymbols":["qbc"]},"other-cards":{"magicEdenSymbols":["badhand","bonkuji","collectiblescom","phygitals","phygitals___","phygitals_staging","cards_","squidchops_pass_cards","meta_racing","relique","nub_packs","vault_runners"]}}}
     ports:
       - "127.0.0.1:3002:3000"

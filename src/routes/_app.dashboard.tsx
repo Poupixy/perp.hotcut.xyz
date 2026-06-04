@@ -260,6 +260,16 @@ type TrackedNftView = {
   asset: TrackedNftAsset | null;
 };
 
+type CollectionPreviewAsset = {
+  mint: string;
+  name: string | null;
+  image: string | null;
+  owner: string | null;
+  collection: string | null;
+  tokenStandard: string | null;
+  interface: string | null;
+};
+
 const NFT_MARKET_OPTIONS = [
   ["pokemon", "Pokémon"],
   ["one_piece", "One Piece"],
@@ -389,6 +399,106 @@ function TrackedNftsPanel() {
           ))}
         </div>
       </div>
+
+      <CollectionDiscoveryPanel onIngested={load} />
+    </div>
+  );
+}
+
+function CollectionDiscoveryPanel({ onIngested }: { onIngested: () => Promise<void> }) {
+  const [collectionAddress, setCollectionAddress] = useState("");
+  const [assets, setAssets] = useState<CollectionPreviewAsset[]>([]);
+  const [total, setTotal] = useState<number | null>(null);
+  const [loadingPreview, setLoadingPreview] = useState(false);
+  const [ingesting, setIngesting] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+
+  async function postCollection(url: string, body: unknown) {
+    const response = await fetch(url, { method: "POST", headers: { "content-type": "application/json", accept: "application/json" }, body: JSON.stringify(body) });
+    const payload = await response.json().catch(() => ({})) as { error?: string; assets?: CollectionPreviewAsset[]; total?: number | null; savedAssets?: number; assetsFound?: number };
+    if (!response.ok) throw new Error(payload.error ?? "Request failed");
+    return payload;
+  }
+
+  async function previewCollection() {
+    setLoadingPreview(true);
+    setMessage(null);
+    try {
+      const payload = await postCollection("/api/nfts/collections/preview", { collectionAddress, limit: 10 });
+      setAssets(payload.assets ?? []);
+      setTotal(payload.total ?? null);
+      setMessage(`Preview loaded: ${(payload.assets ?? []).length} NFTs shown${typeof payload.total === "number" ? ` / ${payload.total} total` : ""}.`);
+    } catch (error) {
+      setAssets([]);
+      setTotal(null);
+      setMessage(error instanceof Error ? error.message : "Unable to preview collection");
+    } finally {
+      setLoadingPreview(false);
+    }
+  }
+
+  async function ingestCollection() {
+    setIngesting(true);
+    setMessage(null);
+    try {
+      const payload = await postCollection("/api/nfts/collections/ingest", { collectionAddress });
+      setMessage(`Collection saved: ${payload.savedAssets ?? 0} NFTs stored from ${payload.assetsFound ?? 0} assets found.`);
+      await onIngested();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to ingest collection");
+    } finally {
+      setIngesting(false);
+    }
+  }
+
+  const disabled = !collectionAddress.trim() || loadingPreview || ingesting;
+
+  return (
+    <div className="border-t border-border bg-card p-5 space-y-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-semibold">Collection discovery</h3>
+          <p className="mt-0.5 text-xs text-muted-foreground">Paste an allowlisted Helius collection address to preview its NFTs before saving them into tracked_nfts.</p>
+        </div>
+        <div className="text-[11px] text-muted-foreground font-mono">Preview: 10 NFTs · server-side Helius</div>
+      </div>
+
+      <div className="grid lg:grid-cols-[1fr_auto_auto] gap-3">
+        <input
+          value={collectionAddress}
+          onChange={(event) => setCollectionAddress(event.target.value)}
+          placeholder="Collection address, e.g. CCrypt..."
+          className="h-10 rounded-md border border-border bg-surface px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+        />
+        <button onClick={previewCollection} disabled={disabled} className="h-10 px-4 rounded-md border border-border bg-surface text-sm font-medium hover:bg-surface-raised disabled:opacity-50 transition">
+          {loadingPreview ? "Loading..." : "Preview NFTs"}
+        </button>
+        <button onClick={ingestCollection} disabled={disabled} className="h-10 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50 transition">
+          {ingesting ? "Saving..." : "Save collection"}
+        </button>
+      </div>
+
+      {message && <div className="text-xs text-muted-foreground">{message}</div>}
+
+      {assets.length > 0 && (
+        <div className="space-y-3">
+          <div className="text-xs text-muted-foreground font-mono">{assets.length} NFTs shown{typeof total === "number" ? ` · ${total} total reported by Helius` : ""}</div>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+            {assets.map((asset) => (
+              <div key={asset.mint} className="rounded-md border border-border bg-surface p-3 min-w-0">
+                {asset.image ? <img src={asset.image} alt="" className="aspect-square w-full rounded object-cover bg-muted" /> : <div className="aspect-square w-full rounded bg-muted" />}
+                <div className="mt-3 text-sm font-medium truncate">{asset.name ?? "Unnamed NFT"}</div>
+                <div className="mt-1 text-[11px] text-muted-foreground font-mono truncate">{asset.mint}</div>
+                <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+                  <div className="truncate">Owner: {asset.owner ?? "--"}</div>
+                  <div className="truncate">Collection: {asset.collection ?? "--"}</div>
+                  <div className="truncate">Standard: {asset.tokenStandard ?? asset.interface ?? "--"}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
