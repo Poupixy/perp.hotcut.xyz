@@ -61,7 +61,7 @@ export function AppSidebar() {
         <div className="px-2 py-2 text-[10px] text-muted-foreground group-data-[collapsible=icon]:hidden">
           <div className="flex items-center gap-1.5">
             <span className="h-1.5 w-1.5 rounded-full bg-success animate-pulse" />
-            Prototype data · v0.1
+            Live metadata · v0.1
           </div>
         </div>
       </SidebarFooter>

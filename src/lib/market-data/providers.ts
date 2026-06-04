@@ -1,4 +1,3 @@
-import { sales as mockSales } from "@/lib/mock-data";
 import { MARKET_NAMES, getRuntimeEnv, readMarketSourceConfig } from "./config";
 import type { MarketProvider, MarketSalesResponse, MarketSourceConfig, NormalizedSale, ProviderStatus } from "./types";
 
@@ -200,24 +199,6 @@ async function fetchSolscanSales(window: FetchWindow, config: Record<string, Mar
   return { sales, warnings, status: { provider: "solscan", enabled: true, ok: warnings.length === 0 || sales.length > 0, message: sales.length ? `${sales.length} sale(s) fetched.` : "Configured, but no recent sales returned." } };
 }
 
-function fallbackSales(window: FetchWindow): NormalizedSale[] {
-  return mockSales.map((sale, index) => ({
-    id: `mock:${sale.id}`,
-    marketSlug: sale.collectionSlug,
-    marketName: sale.category,
-    assetName: sale.asset,
-    assetImage: sale.image,
-    grade: sale.grade,
-    salePrice: sale.price,
-    currency: "USD",
-    saleTime: new Date(window.to.getTime() - (index + 1) * 46 * 60 * 1000).toISOString(),
-    marketplace: sale.marketplace,
-    source: "mock" as MarketProvider,
-    buyer: sale.buyer,
-    seller: sale.seller,
-  }));
-}
-
 export async function fetchMarketSales(days: number): Promise<MarketSalesResponse> {
   const to = new Date();
   const from = new Date(to.getTime() - days * 24 * 60 * 60 * 1000);
@@ -232,7 +213,6 @@ export async function fetchMarketSales(days: number): Promise<MarketSalesRespons
     { provider: "collector-crypt", enabled: false, ok: false, message: "No documented public Collector Crypt sales API is configured." },
   ];
   const liveSales = [...magicEden.sales, ...solscan.sales];
-  const sales = liveSales.length ? liveSales : fallbackSales(window);
 
   return {
     generatedAt: to.toISOString(),
@@ -240,7 +220,7 @@ export async function fetchMarketSales(days: number): Promise<MarketSalesRespons
     to: to.toISOString(),
     days,
     live: liveSales.length > 0,
-    sales: sales.sort((a, b) => new Date(b.saleTime).getTime() - new Date(a.saleTime).getTime()),
+    sales: liveSales.sort((a, b) => new Date(b.saleTime).getTime() - new Date(a.saleTime).getTime()),
     providerStatus,
     warnings: [...(magicEden.warnings ?? []), ...(solscan.warnings ?? [])],
   };

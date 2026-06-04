@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { fmtUSD } from "@/lib/mock-data";
+import { fmtUSD } from "@/lib/real-market-data";
 import { TypeBadge } from "@/components/app/Badges";
 import { RelativeTime } from "@/components/app/RelativeTime";
 import { useMarketSales } from "@/lib/market-data/use-market-sales";

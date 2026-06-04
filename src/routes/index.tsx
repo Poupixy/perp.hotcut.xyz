@@ -1,14 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowRight, Sparkles, TrendingUp, Layers, ShieldCheck, Activity } from "lucide-react";
-import { categories, fmtUSD, sales } from "@/lib/mock-data";
+import { fmtCount, fmtSOL, realMarketCategories, realProviderCollections, realTotals } from "@/lib/real-market-data";
 
 const trackedPlatforms = [
-  { name: "Magic Eden", market: "Live marketplace sales", status: "Live", statusTone: "live", refresh: "10 min refresh", coverage: "89 sales · 7d" },
-  { name: "Phygitals", market: "Tracked via Magic Eden symbols", status: "Watching", statusTone: "watching", refresh: "10 min refresh", coverage: "0 sales · 30d" },
-  { name: "Collector Crypt", market: "Needs official API or on-chain IDs", status: "To connect", statusTone: "pending", refresh: "Pending", coverage: "No public API" },
-  { name: "Beezie", market: "Marketplace identified", status: "To connect", statusTone: "pending", refresh: "Pending", coverage: "Needs chain IDs" },
-  { name: "Tensor", market: "Seen through Magic Eden aggregator", status: "Indirect", statusTone: "watching", refresh: "10 min refresh", coverage: "Via Magic Eden" },
-  { name: "Helius / Solscan", market: "On-chain fallback", status: "Ready", statusTone: "pending", refresh: "Needs API keys", coverage: "Not active" },
+  { name: "Collector Crypt", market: "Allowlisted Helius collection", status: "Live", statusTone: "live", refresh: "30s/page", coverage: `${fmtCount(realTotals.collectorCryptTrackedAssets)} filtered NFTs` },
+  { name: "Phygitals", market: "2 allowlisted Helius collections", status: "Live", statusTone: "live", refresh: "30s/page", coverage: `${fmtCount(realTotals.phygitalsTrackedAssets)} filtered NFTs` },
+  { name: "Helius DAS", market: "Server-side NFT metadata", status: "Ready", statusTone: "watching", refresh: "2 calls/min", coverage: `${fmtCount(realTotals.trackedAssets)} target NFTs` },
+  { name: "Magic Eden", market: "Category and holder stats", status: "Source", statusTone: "watching", refresh: "Manual snapshot", coverage: `${fmtCount(realTotals.providerSupply)} provider supply` },
 ];
 
 export const Route = createFileRoute("/")({
@@ -55,7 +53,7 @@ function Landing() {
         <div className="relative mx-auto max-w-7xl px-6 py-24 sm:py-32">
           <div className="inline-flex items-center gap-2 rounded-full border border-border bg-surface/70 px-3 py-1 text-xs text-muted-foreground mb-6">
             <span className="h-1.5 w-1.5 rounded-full bg-success animate-pulse" />
-            Prototype data · category-first market structure
+            Live provider metadata · category-first market structure
           </div>
           <h1 className="text-4xl sm:text-6xl font-semibold tracking-tight max-w-3xl leading-[1.05]">
             Market intelligence for{" "}
@@ -77,7 +75,7 @@ function Landing() {
                 Magic Eden live
               </div>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-px bg-border">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-px bg-border">
               {trackedPlatforms.map((platform) => (
                 <div key={platform.name} className="bg-card p-4 min-w-0">
                   <div className="flex items-start justify-between gap-3">
@@ -113,26 +111,22 @@ function Landing() {
           <p className="mt-3 text-muted-foreground max-w-xl">Perp RWA organizes collectibles by broad market category first, then individual assets and confirmed sales.</p>
 
           <div className="mt-12 grid md:grid-cols-3 gap-px bg-border border border-border rounded-lg overflow-hidden">
-            {categories.slice(0, 5).map((category) => (
+            {realMarketCategories.slice(0, 5).map((category) => (
               <div key={category.name} className="bg-card p-6">
                 <Layers className="h-4 w-4 text-primary" />
                 <h3 className="mt-3 text-sm font-semibold">{category.name}</h3>
                 <dl className="mt-4 grid grid-cols-2 gap-3 text-xs">
                   <div>
-                    <dt className="text-muted-foreground">Market scope</dt>
-                    <dd className="mt-1 font-mono font-semibold">Global</dd>
+                    <dt className="text-muted-foreground">Collector Crypt</dt>
+                    <dd className="mt-1 font-mono font-semibold">{fmtCount(category.collectorCryptAssets)}</dd>
                   </div>
                   <div>
-                    <dt className="text-muted-foreground">Assets</dt>
-                    <dd className="mt-1 font-mono font-semibold">{category.assets.toLocaleString()}</dd>
+                    <dt className="text-muted-foreground">Phygitals</dt>
+                    <dd className="mt-1 font-mono font-semibold">{fmtCount(category.phygitalsAssets)}</dd>
                   </div>
                   <div>
-                    <dt className="text-muted-foreground">24h volume</dt>
-                    <dd className="mt-1 font-mono font-semibold">{fmtUSD(category.volume24h)}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-muted-foreground">24h trend</dt>
-                    <dd className="mt-1 font-mono font-semibold">{category.change24h > 0 ? "+" : ""}{category.change24h.toFixed(1)}%</dd>
+                    <dt className="text-muted-foreground">Filtered NFTs</dt>
+                    <dd className="mt-1 font-mono font-semibold">{fmtCount(category.assets)}</dd>
                   </div>
                 </dl>
               </div>
@@ -170,8 +164,8 @@ function Landing() {
         <div className="mx-auto max-w-7xl px-6 py-24">
           <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
             <div>
-              <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight">Recent verified sales</h2>
-              <p className="mt-3 text-muted-foreground max-w-xl">Mock sales data shows the target hierarchy from market category to asset-level transaction.</p>
+              <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight">Provider collection snapshot</h2>
+              <p className="mt-3 text-muted-foreground max-w-xl">Real collection addresses, supply, holder count, and filtered NFT coverage for the providers currently tracked.</p>
             </div>
             <Link
               to="/sales"
@@ -184,21 +178,21 @@ function Landing() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border">
-                  <th className="text-left font-medium px-5 py-3">Asset</th>
-                  <th className="text-left font-medium px-5 py-3">Category</th>
-                  <th className="text-left font-medium px-5 py-3">Market</th>
-                  <th className="text-left font-medium px-5 py-3">Grade</th>
-                  <th className="text-right font-medium px-5 py-3">Sale price</th>
+                  <th className="text-left font-medium px-5 py-3">Collection</th>
+                  <th className="text-left font-medium px-5 py-3">Provider</th>
+                  <th className="text-right font-medium px-5 py-3">Supply</th>
+                  <th className="text-right font-medium px-5 py-3">Filtered NFTs</th>
+                  <th className="text-right font-medium px-5 py-3">Floor</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {sales.slice(0, 4).map((sale) => (
-                  <tr key={sale.id}>
-                    <td className="px-5 py-3 font-medium">{sale.asset}</td>
-                    <td className="px-5 py-3 text-muted-foreground">{sale.category}</td>
-                    <td className="px-5 py-3 text-muted-foreground">{sale.collectionName}</td>
-                    <td className="px-5 py-3 text-muted-foreground">{sale.grade}</td>
-                    <td className="px-5 py-3 text-right font-mono font-semibold">{fmtUSD(sale.price)}</td>
+                {realProviderCollections.map((collection) => (
+                  <tr key={collection.id}>
+                    <td className="px-5 py-3 font-medium">{collection.name}</td>
+                    <td className="px-5 py-3 text-muted-foreground">{collection.provider}</td>
+                    <td className="px-5 py-3 text-right font-mono">{fmtCount(collection.supply)}</td>
+                    <td className="px-5 py-3 text-right font-mono font-semibold">{fmtCount(collection.trackedAssets)}</td>
+                    <td className="px-5 py-3 text-right font-mono">{fmtSOL(collection.floorSol)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -214,7 +208,7 @@ function Landing() {
       </section>
 
       <footer className="mx-auto max-w-7xl px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-muted-foreground">
-        <div>© 2026 Perp RWA. Prototype data for market-intelligence workflows.</div>
+        <div>© 2026 Perp RWA. Provider metadata for market-intelligence workflows.</div>
         <div>Tokenized collectibles · Trading cards · Phygital assets</div>
       </footer>
     </div>

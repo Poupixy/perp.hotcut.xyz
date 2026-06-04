@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { categories, collections, fmtUSD } from "@/lib/mock-data";
+import { fmtCount, fmtSOL, fmtUSD, realMarketCategories, realProviderCollections, realTotals } from "@/lib/real-market-data";
 import { ChangeBadge } from "@/components/app/Badges";
 import { ArrowUpRight, TrendingUp, DollarSign, Layers, BarChart3 } from "lucide-react";
 import { usePokemonIndex } from "@/lib/rwa-index/use-pokemon-index";
@@ -13,16 +13,13 @@ export const Route = createFileRoute("/_app/dashboard")({
 
 function Dashboard() {
   const pokemonIndex = usePokemonIndex();
-  const totalVolume24h = collections.reduce((s, c) => s + c.volume24h, 0);
-  const totalVolume7d = collections.reduce((s, c) => s + c.volume7d, 0);
-  const topCategories = [...categories].sort((a, b) => b.volume24h - a.volume24h).slice(0, 4);
-  const topVolume = [...collections].sort((a, b) => b.volume24h - a.volume24h).slice(0, 5);
+  const topCategories = [...realMarketCategories].sort((a, b) => b.assets - a.assets).slice(0, 4);
 
   const stats = [
-    { label: "Verified 24h Volume", value: fmtUSD(totalVolume24h), change: 6.42, icon: DollarSign },
-    { label: "Verified 7d Volume", value: fmtUSD(totalVolume7d), change: 3.18, icon: TrendingUp },
-    { label: "Market Categories", value: categories.length.toString(), change: 0, icon: Layers },
-    { label: "Tracked Assets", value: collections.reduce((s, c) => s + c.trackedAssets, 0).toLocaleString(), change: 2.1, icon: BarChart3 },
+    { label: "Tracked categories", value: realTotals.categories.toString(), icon: Layers },
+    { label: "Filtered NFT mints", value: fmtCount(realTotals.trackedAssets), icon: BarChart3 },
+    { label: "Provider supply", value: fmtCount(realTotals.providerSupply), icon: TrendingUp },
+    { label: "Provider holders", value: fmtCount(realTotals.holders), icon: DollarSign },
   ];
 
   return (
@@ -43,7 +40,6 @@ function Dashboard() {
             </div>
             <div className="mt-3 flex items-baseline justify-between">
               <span className="text-2xl font-semibold font-mono tabular-nums">{s.value}</span>
-              {s.change !== 0 && <ChangeBadge value={s.change} />}
             </div>
           </div>
         ))}
@@ -55,8 +51,8 @@ function Dashboard() {
         <div className="lg:col-span-2 rounded-lg border border-border bg-card">
           <div className="flex items-center justify-between p-5 border-b border-border">
             <div>
-              <h2 className="text-sm font-semibold">Verified sales volume — last 7 days</h2>
-              <p className="text-xs text-muted-foreground mt-0.5">Mock trend aggregated across tracked categories</p>
+              <h2 className="text-sm font-semibold">Tracked category coverage</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">Real category counts from Collector Crypt and Phygitals metadata</p>
             </div>
             <div className="flex gap-1">
               {["24h", "7d", "30d"].map((p, i) => (
@@ -64,12 +60,12 @@ function Dashboard() {
               ))}
             </div>
           </div>
-          <ChartPlaceholder />
+          <CategoryCoverageChart />
         </div>
 
         <div className="rounded-lg border border-border bg-card">
           <div className="p-5 border-b border-border">
-            <h2 className="text-sm font-semibold">Top categories by 24h volume</h2>
+            <h2 className="text-sm font-semibold">Top categories by NFT count</h2>
           </div>
           <div className="divide-y divide-border">
             {topCategories.map((category) => (
@@ -79,11 +75,11 @@ function Dashboard() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium truncate">{category.name}</div>
-                  <div className="text-xs text-muted-foreground font-mono">{category.assets.toLocaleString()} tracked assets</div>
+                  <div className="text-xs text-muted-foreground font-mono">{fmtCount(category.assets)} filtered NFTs</div>
                 </div>
                 <div className="text-right">
-                  <div className="text-sm font-semibold font-mono">{fmtUSD(category.volume24h)}</div>
-                  <ChangeBadge value={category.change24h} />
+                  <div className="text-sm font-semibold font-mono">{fmtCount(category.collectorCryptAssets)}</div>
+                  <div className="text-[10px] text-muted-foreground">Collector Crypt</div>
                 </div>
               </div>
             ))}
@@ -94,7 +90,7 @@ function Dashboard() {
       <div className="grid lg:grid-cols-2 gap-4">
         <div className="rounded-lg border border-border bg-card overflow-hidden">
           <div className="flex items-center justify-between p-5 border-b border-border">
-            <h2 className="text-sm font-semibold">Top collections by liquidity</h2>
+            <h2 className="text-sm font-semibold">Provider collections</h2>
             <Link to="/collections" className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1">
               View all <ArrowUpRight className="h-3 w-3" />
             </Link>
@@ -103,14 +99,14 @@ function Dashboard() {
             <thead>
               <tr className="text-[11px] uppercase tracking-wider text-muted-foreground">
                 <th className="text-left font-medium px-5 py-2">Collection</th>
-                <th className="text-left font-medium px-5 py-2">Category</th>
+                <th className="text-left font-medium px-5 py-2">Provider</th>
+                <th className="text-right font-medium px-5 py-2">Filtered NFTs</th>
+                <th className="text-right font-medium px-5 py-2">Supply</th>
                 <th className="text-right font-medium px-5 py-2">Floor</th>
-                <th className="text-right font-medium px-5 py-2">24h Vol</th>
-                <th className="text-right font-medium px-5 py-2">24h</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {topVolume.map((c) => (
+              {realProviderCollections.map((c) => (
                 <tr key={c.id} className="hover:bg-surface-raised/40 transition">
                   <td className="px-5 py-3">
                     <Link to="/collections/$slug" params={{ slug: c.slug }} className="flex items-center gap-2.5">
@@ -118,10 +114,10 @@ function Dashboard() {
                       <span className="font-medium truncate max-w-[180px]">{c.name}</span>
                     </Link>
                   </td>
-                  <td className="px-5 py-3 text-muted-foreground">{c.category}</td>
-                  <td className="text-right font-mono tabular-nums px-5 py-3">{fmtUSD(c.floorPrice)}</td>
-                  <td className="text-right font-mono tabular-nums px-5 py-3">{fmtUSD(c.volume24h)}</td>
-                  <td className="text-right px-5 py-3"><ChangeBadge value={c.change24h} /></td>
+                  <td className="px-5 py-3 text-muted-foreground">{c.provider}</td>
+                  <td className="text-right font-mono tabular-nums px-5 py-3">{fmtCount(c.trackedAssets)}</td>
+                  <td className="text-right font-mono tabular-nums px-5 py-3">{fmtCount(c.supply)}</td>
+                  <td className="text-right font-mono tabular-nums px-5 py-3">{fmtSOL(c.floorSol)}</td>
                 </tr>
               ))}
             </tbody>
@@ -212,30 +208,19 @@ function formatNullableUsd(value?: number | null) {
   return typeof value === "number" ? fmtUSD(value) : "--";
 }
 
-function ChartPlaceholder() {
-  const points = [22, 28, 24, 32, 38, 34, 42, 39, 48, 52, 47, 58, 62, 56, 68, 72, 64, 78, 82, 76, 88];
-  const max = Math.max(...points);
-  const min = Math.min(...points);
-  const w = 800, h = 240, pad = 16;
-  const stepX = (w - pad * 2) / (points.length - 1);
-  const y = (v: number) => h - pad - ((v - min) / (max - min)) * (h - pad * 2);
-  const path = points.map((v, i) => `${i === 0 ? "M" : "L"} ${pad + i * stepX} ${y(v)}`).join(" ");
-  const area = `${path} L ${pad + (points.length - 1) * stepX} ${h - pad} L ${pad} ${h - pad} Z`;
+function CategoryCoverageChart() {
+  const max = Math.max(...realMarketCategories.map((category) => category.assets));
   return (
-    <div className="p-5">
-      <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-56" preserveAspectRatio="none">
-        <defs>
-          <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="oklch(0.78 0.14 75)" stopOpacity="0.35" />
-            <stop offset="100%" stopColor="oklch(0.78 0.14 75)" stopOpacity="0" />
-          </linearGradient>
-        </defs>
-        {[0.25, 0.5, 0.75].map((p) => (
-          <line key={p} x1={pad} x2={w - pad} y1={pad + p * (h - pad * 2)} y2={pad + p * (h - pad * 2)} stroke="oklch(1 0 0 / 0.05)" strokeDasharray="2 4" />
-        ))}
-        <path d={area} fill="url(#g)" />
-        <path d={path} fill="none" stroke="oklch(0.78 0.14 75)" strokeWidth="2" />
-      </svg>
+    <div className="p-5 space-y-3">
+      {realMarketCategories.map((category) => (
+        <div key={category.slug} className="grid grid-cols-[140px_1fr_auto] items-center gap-3 text-xs">
+          <div className="truncate text-muted-foreground">{category.name}</div>
+          <div className="h-2 rounded-full bg-surface overflow-hidden">
+            <div className="h-full rounded-full bg-primary" style={{ width: `${Math.max(2, (category.assets / max) * 100)}%` }} />
+          </div>
+          <div className="font-mono font-semibold tabular-nums">{fmtCount(category.assets)}</div>
+        </div>
+      ))}
     </div>
   );
 }

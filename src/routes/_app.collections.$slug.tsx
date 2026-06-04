@@ -1,6 +1,6 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { collections, fmtUSD } from "@/lib/mock-data";
+import { fmtCount, fmtUSD, realMarketCategories } from "@/lib/real-market-data";
 import { RelativeTime } from "@/components/app/RelativeTime";
 import { useMarketSales } from "@/lib/market-data/use-market-sales";
 import type { MarketProvider, NormalizedSale, ProviderStatus } from "@/lib/market-data/types";
@@ -9,7 +9,7 @@ import { ArrowLeft, ExternalLink } from "lucide-react";
 export const Route = createFileRoute("/_app/collections/$slug")({
   component: MarketDetail,
   loader: ({ params }) => {
-    const market = collections.find((c) => c.slug === params.slug);
+    const market = realMarketCategories.find((c) => c.slug === params.slug);
     if (!market) throw notFound();
     return { market };
   },
@@ -42,7 +42,7 @@ const providerLabels: Record<MarketProvider, string> = {
   tensor: "Tensor",
   solscan: "Solscan",
   helius: "Helius",
-  mock: "Mock",
+  mock: "Stored feed",
 };
 
 function MarketDetail() {
@@ -56,7 +56,6 @@ function MarketDetail() {
   );
   const filteredSales = provider === "all" ? marketSales : marketSales.filter((sale) => sale.source === provider);
   const assetRows = useMemo(() => buildAssetRows(filteredSales), [filteredSales]);
-  const usdVolume = filteredSales.filter((sale) => sale.currency === "USD").reduce((sum, sale) => sum + sale.salePrice, 0);
   const trackedProviders = data?.providerStatus.map((status) => status.provider) ?? [];
   const activeProviders = Array.from(new Set([...trackedProviders, ...marketSales.map((sale) => sale.source)]));
   const providerOptions: ProviderFilter[] = ["all", ...activeProviders];
@@ -68,11 +67,11 @@ function MarketDetail() {
       </Link>
 
       <div className="flex flex-col lg:flex-row gap-5 items-start">
-        <img src={market.image} alt={market.name} className="h-24 w-24 rounded-xl object-cover bg-muted ring-1 ring-border" />
+        <div className="h-24 w-24 rounded-xl bg-primary/10 ring-1 ring-primary/20" />
         <div className="flex-1 min-w-0">
           <div className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-3 py-1 text-xs text-muted-foreground">
             <span className={`h-1.5 w-1.5 rounded-full ${data?.live ? "bg-success animate-pulse" : "bg-muted-foreground"}`} />
-            {data?.live ? "Live provider feed" : "Mock feed until providers are configured"}
+            {data?.live ? "Live provider feed" : "Provider sales feed"}
           </div>
           <h1 className="mt-3 text-2xl font-semibold tracking-tight">{market.name}</h1>
           <p className="text-sm text-muted-foreground mt-1 max-w-2xl">
@@ -82,10 +81,10 @@ function MarketDetail() {
       </div>
 
       <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-3">
+        <Stat label="Filtered NFT mints" value={fmtCount(market.assets)} />
+        <Stat label="Collector Crypt" value={fmtCount(market.collectorCryptAssets)} />
+        <Stat label="Phygitals" value={fmtCount(market.phygitalsAssets)} />
         <Stat label="7d confirmed sales" value={loading ? "..." : filteredSales.length.toString()} />
-        <Stat label="USD sale volume" value={loading ? "..." : fmtUSD(usdVolume)} />
-        <Stat label="Tracked providers" value={loading ? "..." : trackedProviders.length.toString()} />
-        <Stat label="Refresh cadence" value="10 min" />
       </div>
 
       <ProviderStatusPanel statuses={data?.providerStatus ?? []} loading={loading} error={error} live={Boolean(data?.live)} />
@@ -227,7 +226,7 @@ function ProviderStatusPanel({ statuses, loading, error, live }: { statuses: Pro
         <div>
           <div className="flex items-center gap-2 text-sm font-medium">
             <span className={`h-2 w-2 rounded-full ${live ? "bg-success animate-pulse" : "bg-muted-foreground"}`} />
-            {live ? "Live provider tracking active" : "Provider tracking ready · currently using mock fallback"}
+            {live ? "Live provider tracking active" : "Provider tracking ready · no live sale rows for this view"}
           </div>
           <div className="text-xs text-muted-foreground mt-1">Refresh cadence: 10 minutes · target window: 150 NFT sales per provider</div>
         </div>
@@ -271,7 +270,7 @@ function AssetState({ sale, live }: { sale?: NormalizedSale; live: boolean }) {
   return (
     <span className={`inline-flex items-center gap-1.5 rounded border px-2 py-1 text-[11px] ${live ? "border-success/30 bg-success/10 text-success" : "border-border bg-surface text-muted-foreground"}`}>
       <span className={`h-1.5 w-1.5 rounded-full ${live ? "bg-success" : "bg-muted-foreground"}`} />
-      {live ? "Live" : "Mock"}
+      {live ? "Live" : "Stored"}
     </span>
   );
 }
