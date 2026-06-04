@@ -42,7 +42,7 @@ export const TARGET_NFTS: TargetNftConfig[] = [
 ];
 
 // Keep this list empty in code by default. Real collection addresses should be supplied server-side
-// through PHYGITALS_COLLECTION_ADDRESSES or added here intentionally in a committed allowlist.
+// through provider-specific env vars or added here intentionally in a committed allowlist.
 export const ALLOWED_NFT_COLLECTIONS: TargetNftCollectionConfig[] = [];
 
 function env() {
@@ -65,8 +65,8 @@ export function isProbablySolanaAddress(value: string): boolean {
   return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(value.trim());
 }
 
-function phygitalsCollectionsFromEnv(): TargetNftCollectionConfig[] {
-  const raw = env().PHYGITALS_COLLECTION_ADDRESSES;
+function collectionsFromEnv(envKey: string, label: string, defaultMarket: TrackedNftMarket): TargetNftCollectionConfig[] {
+  const raw = env()[envKey];
   if (!raw) return [];
 
   try {
@@ -75,11 +75,11 @@ function phygitalsCollectionsFromEnv(): TargetNftCollectionConfig[] {
       return parsed
         .map((item): TargetNftCollectionConfig | null => {
           if (typeof item === "string") {
-            return { collectionAddress: normalizeCollectionAddress(item), market: "other_cards", label: "Phygitals" };
+            return { collectionAddress: normalizeCollectionAddress(item), market: defaultMarket, label };
           }
           const collectionAddress = normalizeCollectionAddress(item.collectionAddress ?? "");
-          const market = item.market && isValidMarket(item.market) ? item.market : "other_cards";
-          return collectionAddress ? { collectionAddress, market, label: item.label ?? "Phygitals" } : null;
+          const market = item.market && isValidMarket(item.market) ? item.market : defaultMarket;
+          return collectionAddress ? { collectionAddress, market, label: item.label ?? label } : null;
         })
         .filter((item): item is TargetNftCollectionConfig => Boolean(item));
     }
@@ -91,12 +91,19 @@ function phygitalsCollectionsFromEnv(): TargetNftCollectionConfig[] {
     .split(",")
     .map((value) => normalizeCollectionAddress(value))
     .filter(Boolean)
-    .map((collectionAddress) => ({ collectionAddress, market: "other_cards" as const, label: "Phygitals" }));
+    .map((collectionAddress) => ({ collectionAddress, market: defaultMarket, label }));
 }
 
 export function getAllowedNftCollections(): TargetNftCollectionConfig[] {
   const byAddress = new Map<string, TargetNftCollectionConfig>();
-  for (const item of [...ALLOWED_NFT_COLLECTIONS, ...phygitalsCollectionsFromEnv()]) {
+  const envCollections = [
+    ...collectionsFromEnv("COLLECTOR_CRYPT_COLLECTION_ADDRESSES", "Collector Crypt", "graded_cards"),
+    ...collectionsFromEnv("PHYGITALS_COLLECTION_ADDRESSES", "Phygitals", "other_cards"),
+    ...collectionsFromEnv("BEEZIE_COLLECTION_ADDRESSES", "Beezie", "other_cards"),
+    ...collectionsFromEnv("NFT_COLLECTION_ADDRESSES", "Allowlisted collection", "other_cards"),
+  ];
+
+  for (const item of [...ALLOWED_NFT_COLLECTIONS, ...envCollections]) {
     const collectionAddress = normalizeCollectionAddress(item.collectionAddress);
     if (!collectionAddress || !isProbablySolanaAddress(collectionAddress)) continue;
     byAddress.set(collectionAddress, { ...item, collectionAddress });
