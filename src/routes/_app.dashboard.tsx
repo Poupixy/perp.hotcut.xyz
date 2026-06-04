@@ -5,6 +5,7 @@ import { ChangeBadge } from "@/components/app/Badges";
 import { ArrowUpRight, TrendingUp, DollarSign, Layers, BarChart3 } from "lucide-react";
 import { usePokemonIndex } from "@/lib/rwa-index/use-pokemon-index";
 import type { IndexSnapshot, Sale as IndexSale } from "@/lib/rwa-index/models";
+import { trackedMarketLabel } from "@/services/trackedMarketCategories";
 
 export const Route = createFileRoute("/_app/dashboard")({
   component: Dashboard,
@@ -279,7 +280,7 @@ function TrackedNftsPanel() {
   async function load() {
     setLoading(true);
     try {
-      const response = await fetch("/api/nfts/tracked", { headers: { accept: "application/json" } });
+      const response = await fetch("/api/nfts/tracked?active=true&approved=true", { headers: { accept: "application/json" } });
       const payload = await response.json() as { nfts?: TrackedNftView[]; error?: string };
       if (!response.ok) throw new Error(payload.error ?? "Unable to load tracked NFTs");
       setItems(payload.nfts ?? []);
@@ -338,10 +339,10 @@ function TrackedNftsPanel() {
     <div className="rounded-lg border border-border bg-card overflow-hidden">
       <div className="flex flex-wrap items-start justify-between gap-4 p-5 border-b border-border">
         <div>
-          <h2 className="text-sm font-semibold">Controlled NFT tracking</h2>
-          <p className="text-xs text-muted-foreground mt-0.5">Only allowlisted mints in tracked_nfts can be fetched through the server-side Helius queue.</p>
+          <h2 className="text-sm font-semibold">Approved tracked NFT assets</h2>
+          <p className="text-xs text-muted-foreground mt-0.5">Track and review approved NFT assets from allowlisted markets and provider collections.</p>
         </div>
-        <div className="text-[11px] text-muted-foreground font-mono">2 Helius calls/min max</div>
+        <div className="text-[11px] text-muted-foreground font-mono">2 Helius calls/min max · approved markets only</div>
       </div>
 
       <div className="grid lg:grid-cols-[1fr_1fr] gap-px bg-border">
@@ -361,7 +362,7 @@ function TrackedNftsPanel() {
           {loading ? (
             <div className="p-5 text-sm text-muted-foreground">Loading tracked NFTs...</div>
           ) : items.length === 0 ? (
-            <div className="p-5 text-sm text-muted-foreground">No tracked NFTs yet.</div>
+            <div className="p-5 text-sm text-muted-foreground">No approved tracked NFTs yet.</div>
           ) : items.map((item) => (
             <div key={item.mint} className="p-4 flex gap-3">
               {item.asset?.image ? <img src={item.asset.image} alt="" className="h-14 w-14 rounded-md object-cover bg-muted" /> : <div className="h-14 w-14 rounded-md bg-muted" />}
@@ -372,7 +373,7 @@ function TrackedNftsPanel() {
                 </div>
                 <div className="mt-1 text-xs text-muted-foreground font-mono truncate">{item.mint}</div>
                 <div className="mt-1 grid sm:grid-cols-2 gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                  <span>Market: {item.market}</span>
+                  <span>Market: {trackedMarketLabel(item.market)}</span>
                   <span>Last fetch: {item.last_fetched_at ? new Date(item.last_fetched_at).toLocaleString() : "Never"}</span>
                   <span className="truncate">Owner: {item.asset?.owner ?? "--"}</span>
                   <span className="truncate">Collection: {item.asset?.collection ?? "--"}</span>
@@ -445,7 +446,7 @@ function CollectionDiscoveryPanel({ onIngested }: { onIngested: () => Promise<vo
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 className="text-sm font-semibold">Collection discovery</h3>
-          <p className="mt-0.5 text-xs text-muted-foreground">Paste an allowlisted Helius collection address to preview its NFTs before saving them into tracked_nfts.</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">Paste an allowlisted Helius collection address to preview approved NFTs before saving them into tracked_nfts.</p>
         </div>
         <div className="text-[11px] text-muted-foreground font-mono">Preview: 10 NFTs · server-side Helius</div>
       </div>
