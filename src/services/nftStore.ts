@@ -1,6 +1,7 @@
 import { TARGET_NFTS, isPlaceholderMint, isValidMarket, type TargetNftCollectionConfig, type TrackedNftMarket } from "./trackedNftsConfig";
 import type { NftAssetRow, NftIngestionDb, NftQueueState, NormalizedNftAsset, TrackedNftRow, TrackedNftWithAsset } from "./nftTypes";
 import { detectRwaNftCategory } from "./nftCategoryService";
+import { detectCollectibleAssetType, publicGroupForAssetType } from "./nftAssetTypeService";
 import { fromSqliteBool, getNftDb, parseJson, shouldStoreRawHeliusJson, sqliteBool, stringifyJson } from "./nftSqliteDb";
 
 const EMPTY_QUEUE: NftQueueState = { queue: [], processing: false, lastHeliusCallAt: null, backoffUntil: null, updatedAt: null };
@@ -49,6 +50,8 @@ function rowToAsset(row: Record<string, unknown>): NftAssetRow {
     owner: asString(row.owner),
     collection: asString(row.collection),
     category: asString(row.category),
+    asset_type: asString(row.asset_type),
+    public_group: asString(row.public_group),
     attributes_json: parseJson<unknown[]>(row.attributes_json, []),
     token_standard: asString(row.token_standard),
     interface: asString(row.interface),
@@ -126,11 +129,11 @@ function upsertAsset(row: NftAssetRow) {
   getNftDb().prepare(`
     INSERT INTO nft_assets (
       id, mint, market, name, description, image, owner, collection, category, attributes_json,
-      token_standard, interface, source_collection, is_staging, raw_helius_json, is_listed,
+      asset_type, public_group, token_standard, interface, source_collection, is_staging, raw_helius_json, is_listed,
       listed_price_sol, listed_price_usd, listing_marketplace, listing_updated_at,
       last_sale_price_sol, last_sale_price_usd, last_sale_at, last_sale_marketplace, last_sale_tx_signature,
       floor_price_sol, market_updated_at, updated_at, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(mint) DO UPDATE SET
       market = excluded.market,
       name = excluded.name,
@@ -139,6 +142,8 @@ function upsertAsset(row: NftAssetRow) {
       owner = excluded.owner,
       collection = excluded.collection,
       category = excluded.category,
+      asset_type = excluded.asset_type,
+      public_group = excluded.public_group,
       attributes_json = excluded.attributes_json,
       token_standard = excluded.token_standard,
       interface = excluded.interface,
@@ -157,6 +162,8 @@ function upsertAsset(row: NftAssetRow) {
     row.collection,
     row.category,
     stringifyJson(row.attributes_json),
+    row.asset_type,
+    row.public_group,
     row.token_standard,
     row.interface,
     row.source_collection,
@@ -280,6 +287,7 @@ export async function untrackNft(mintInput: string): Promise<TrackedNftRow> {
 
 export async function saveNormalizedAsset(trackedNft: TrackedNftRow, asset: NormalizedNftAsset, rawHelius: unknown): Promise<NftAssetRow> {
   const timestamp = asset.updatedAt || nowIso();
+  const assetType = detectCollectibleAssetType({ ...asset, raw: rawHelius });
   const row: NftAssetRow = {
     id: stableId(asset.mint),
     mint: asset.mint,
@@ -290,6 +298,8 @@ export async function saveNormalizedAsset(trackedNft: TrackedNftRow, asset: Norm
     owner: asset.owner,
     collection: asset.collection,
     category: assetCategory(asset, rawHelius),
+    asset_type: assetType,
+    public_group: publicGroupForAssetType(assetType),
     attributes_json: asset.attributes,
     token_standard: asset.tokenStandard,
     interface: asset.interface,
@@ -335,6 +345,7 @@ export async function saveCollectionAssets(
     const raw = rawByMint.get(asset.mint) ?? asset;
     const category = assetCategory(asset, raw);
     const sourceCollection = asset.collection ?? collection.collectionAddress;
+    const assetType = detectCollectibleAssetType({ ...asset, collection: sourceCollection, raw });
     const row: NftAssetRow = {
       id: stableId(asset.mint),
       mint: asset.mint,
@@ -345,6 +356,8 @@ export async function saveCollectionAssets(
       owner: asset.owner,
       collection: sourceCollection,
       category,
+      asset_type: assetType,
+      public_group: publicGroupForAssetType(assetType),
       attributes_json: asset.attributes,
       token_standard: asset.tokenStandard,
       interface: asset.interface,

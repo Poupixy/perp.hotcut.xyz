@@ -1,6 +1,7 @@
 import { mkdirSync, writeFileSync, existsSync, statSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { ALLOWED_RWA_NFT_CATEGORIES, detectRwaNftCategory, isAllowedRwaNftCategory } from "./nftCategoryService";
+import { detectCollectibleAssetType, publicGroupForAssetType, type RwaCollectibleAssetType, type RwaCollectiblePublicGroup } from "./nftAssetTypeService";
 import { getNftDb, nftDatabasePath, shouldStoreRawHeliusJson, sqliteBool, stringifyJson } from "./nftSqliteDb";
 import { getTrackedMarketCategory, trackedMarketLabel } from "./trackedMarketCategories";
 import { getAllowedNftCollections, type TargetNftCollectionConfig } from "./trackedNftsConfig";
@@ -37,6 +38,8 @@ type AssetCandidate = {
   collection: string | null;
   category: string;
   categorySource: "attribute_filter" | "metadata" | "fallback_collection" | "unknown";
+  assetType: RwaCollectibleAssetType;
+  publicGroup: RwaCollectiblePublicGroup;
   market: string;
   attributes: unknown[];
   tokenStandard: string | null;
@@ -45,6 +48,8 @@ type AssetCandidate = {
   sourceCollectionLabel: string;
   isStaging: boolean;
   previousFilterMatched: boolean;
+  previousFilterMatchedCard: boolean;
+  previousFilterMatchedOther: boolean;
   raw: unknown;
 };
 
@@ -59,10 +64,19 @@ type CollectionReport = {
   heliusReportedTotal: number | null;
   assetsSeen: number;
   previousFilterMatchedAssets: number;
+  previousFilterMatchedCards: number;
+  previousFilterMatchedOther: number;
+  previousFilterMatchedVisibleAssets: number;
+  newVisibleAssetsMissedByPreviousFilter: number;
+  newVisibleCardAssetsMissedByPreviousFilter: number;
+  newVisibleOtherAssetsMissedByPreviousFilter: number;
   allowedCategoryAssets: number;
   unknownCategoryAssets: number;
   stagingAssets: number;
   visibleAfterPublicFilters: number;
+  hiddenOtherAssets: number;
+  assetTypeCounts: Record<string, number>;
+  publicGroupCounts: Record<string, number>;
   duplicatesWithinRunSkipped: number;
   duplicatesAlreadyExisting: number;
   wouldInsert: number;
@@ -70,6 +84,8 @@ type CollectionReport = {
   inserted: number;
   updated: number;
   categoryCounts: Record<string, number>;
+  cardCategoryCounts: Record<string, number>;
+  otherCategoryCounts: Record<string, number>;
   excluded: Record<string, number>;
   errors: string[];
 };
@@ -91,10 +107,17 @@ export type NftUniverseIngestionReport = {
     pagesProcessed: number;
     heliusAssetsSeen: number;
     previousFilterMatchedAssets: number;
+    previousFilterMatchedCards: number;
+    previousFilterMatchedOther: number;
+    previousFilterMatchedVisibleAssets: number;
+    newVisibleAssetsMissedByPreviousFilter: number;
+    newVisibleCardAssetsMissedByPreviousFilter: number;
+    newVisibleOtherAssetsMissedByPreviousFilter: number;
     allowedCategoryAssets: number;
     unknownCategoryAssets: number;
     stagingAssets: number;
     visibleAfterPublicFilters: number;
+    hiddenOtherAssets: number;
     duplicatesWithinRunSkipped: number;
     duplicatesAlreadyExisting: number;
     wouldInsert: number;
@@ -102,6 +125,10 @@ export type NftUniverseIngestionReport = {
     inserted: number;
     updated: number;
     categoryCounts: Record<string, number>;
+    cardCategoryCounts: Record<string, number>;
+    otherCategoryCounts: Record<string, number>;
+    assetTypeCounts: Record<string, number>;
+    publicGroupCounts: Record<string, number>;
     sourceCollectionCounts: Record<string, number>;
     missingImageCount: number;
     missingNameCount: number;
@@ -111,7 +138,13 @@ export type NftUniverseIngestionReport = {
   };
   comparison: {
     previousFilterMatchedAssets: number;
+    previousFilterMatchedCards: number;
+    previousFilterMatchedOther: number;
+    previousFilterMatchedVisibleAssets: number;
     visibleAfterPublicFilters: number;
+    newVisibleAssetsMissedByPreviousFilter: number;
+    newVisibleCardAssetsMissedByPreviousFilter: number;
+    newVisibleOtherAssetsMissedByPreviousFilter: number;
     difference: number;
     matchesPreviousFilterInScannedPages: boolean;
     note: string;
@@ -205,6 +238,15 @@ function normalizeAsset(raw: unknown, collection: TargetNftCollectionConfig): As
       ? "metadata"
       : "unknown";
   const sourceCollection = asString(collectionGroup?.group_value) ?? collection.collectionAddress;
+  const assetType = detectCollectibleAssetType({
+    name: asString(metadata.name),
+    description: asString(metadata.description),
+    collection: sourceCollection,
+    attributes,
+    raw,
+  });
+  const publicGroup = publicGroupForAssetType(assetType);
+  const previousFilterMatched = Boolean(attributeCategory);
 
   return {
     mint,
@@ -215,6 +257,8 @@ function normalizeAsset(raw: unknown, collection: TargetNftCollectionConfig): As
     collection: sourceCollection,
     category: isAllowedRwaNftCategory(category) ? category : "unknown",
     categorySource,
+    assetType,
+    publicGroup,
     market: isAllowedRwaNftCategory(category) ? category : collection.market,
     attributes,
     tokenStandard: asString(tokenInfo.token_program) ?? asString(record.interface),
@@ -222,7 +266,9 @@ function normalizeAsset(raw: unknown, collection: TargetNftCollectionConfig): As
     sourceCollection: collection.collectionAddress,
     sourceCollectionLabel: collection.label,
     isStaging: isStagingText(metadata.name, sourceCollection, collection.label),
-    previousFilterMatched: Boolean(attributeCategory),
+    previousFilterMatched,
+    previousFilterMatchedCard: previousFilterMatched && assetType === "card",
+    previousFilterMatchedOther: previousFilterMatched && assetType !== "card",
     raw,
   };
 }
@@ -267,11 +313,11 @@ function upsertNftAsset(candidate: AssetCandidate, options: { storeRaw: boolean 
   getNftDb().prepare(`
     INSERT INTO nft_assets (
       id, mint, market, name, description, image, owner, collection, category, attributes_json,
-      token_standard, interface, source_collection, is_staging, raw_helius_json, is_listed,
+      asset_type, public_group, token_standard, interface, source_collection, is_staging, raw_helius_json, is_listed,
       listed_price_sol, listed_price_usd, listing_marketplace, listing_updated_at,
       last_sale_price_sol, last_sale_price_usd, last_sale_at, last_sale_marketplace, last_sale_tx_signature,
       floor_price_sol, market_updated_at, updated_at, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, ?, ?)
     ON CONFLICT(mint) DO UPDATE SET
       market = excluded.market,
       name = excluded.name,
@@ -280,6 +326,8 @@ function upsertNftAsset(candidate: AssetCandidate, options: { storeRaw: boolean 
       owner = excluded.owner,
       collection = excluded.collection,
       category = excluded.category,
+      asset_type = excluded.asset_type,
+      public_group = excluded.public_group,
       attributes_json = excluded.attributes_json,
       token_standard = excluded.token_standard,
       interface = excluded.interface,
@@ -298,6 +346,8 @@ function upsertNftAsset(candidate: AssetCandidate, options: { storeRaw: boolean 
     candidate.collection,
     candidate.category,
     stringifyJson(candidate.attributes),
+    candidate.assetType,
+    candidate.publicGroup,
     candidate.tokenStandard,
     candidate.interface,
     candidate.sourceCollection,
@@ -358,10 +408,17 @@ function initCollectionReport(collection: TargetNftCollectionConfig): Collection
     heliusReportedTotal: null,
     assetsSeen: 0,
     previousFilterMatchedAssets: 0,
+    previousFilterMatchedCards: 0,
+    previousFilterMatchedOther: 0,
+    previousFilterMatchedVisibleAssets: 0,
+    newVisibleAssetsMissedByPreviousFilter: 0,
+    newVisibleCardAssetsMissedByPreviousFilter: 0,
+    newVisibleOtherAssetsMissedByPreviousFilter: 0,
     allowedCategoryAssets: 0,
     unknownCategoryAssets: 0,
     stagingAssets: 0,
     visibleAfterPublicFilters: 0,
+    hiddenOtherAssets: 0,
     duplicatesWithinRunSkipped: 0,
     duplicatesAlreadyExisting: 0,
     wouldInsert: 0,
@@ -369,6 +426,10 @@ function initCollectionReport(collection: TargetNftCollectionConfig): Collection
     inserted: 0,
     updated: 0,
     categoryCounts: {},
+    cardCategoryCounts: {},
+    otherCategoryCounts: {},
+    assetTypeCounts: {},
+    publicGroupCounts: {},
     excluded: {},
     errors: [],
   };
@@ -380,10 +441,17 @@ function buildTotals(collections: CollectionReport[]) {
     pagesProcessed: 0,
     heliusAssetsSeen: 0,
     previousFilterMatchedAssets: 0,
+    previousFilterMatchedCards: 0,
+    previousFilterMatchedOther: 0,
+    previousFilterMatchedVisibleAssets: 0,
+    newVisibleAssetsMissedByPreviousFilter: 0,
+    newVisibleCardAssetsMissedByPreviousFilter: 0,
+    newVisibleOtherAssetsMissedByPreviousFilter: 0,
     allowedCategoryAssets: 0,
     unknownCategoryAssets: 0,
     stagingAssets: 0,
     visibleAfterPublicFilters: 0,
+    hiddenOtherAssets: 0,
     duplicatesWithinRunSkipped: 0,
     duplicatesAlreadyExisting: 0,
     wouldInsert: 0,
@@ -391,6 +459,10 @@ function buildTotals(collections: CollectionReport[]) {
     inserted: 0,
     updated: 0,
     categoryCounts: {},
+    cardCategoryCounts: {},
+    otherCategoryCounts: {},
+    assetTypeCounts: {},
+    publicGroupCounts: {},
     sourceCollectionCounts: {},
     missingImageCount: 0,
     missingNameCount: 0,
@@ -403,10 +475,17 @@ function buildTotals(collections: CollectionReport[]) {
     totals.pagesProcessed += collection.pagesScanned;
     totals.heliusAssetsSeen += collection.assetsSeen;
     totals.previousFilterMatchedAssets += collection.previousFilterMatchedAssets;
+    totals.previousFilterMatchedCards += collection.previousFilterMatchedCards;
+    totals.previousFilterMatchedOther += collection.previousFilterMatchedOther;
+    totals.previousFilterMatchedVisibleAssets += collection.previousFilterMatchedVisibleAssets;
+    totals.newVisibleAssetsMissedByPreviousFilter += collection.newVisibleAssetsMissedByPreviousFilter;
+    totals.newVisibleCardAssetsMissedByPreviousFilter += collection.newVisibleCardAssetsMissedByPreviousFilter;
+    totals.newVisibleOtherAssetsMissedByPreviousFilter += collection.newVisibleOtherAssetsMissedByPreviousFilter;
     totals.allowedCategoryAssets += collection.allowedCategoryAssets;
     totals.unknownCategoryAssets += collection.unknownCategoryAssets;
     totals.stagingAssets += collection.stagingAssets;
     totals.visibleAfterPublicFilters += collection.visibleAfterPublicFilters;
+    totals.hiddenOtherAssets += collection.hiddenOtherAssets;
     totals.duplicatesWithinRunSkipped += collection.duplicatesWithinRunSkipped;
     totals.duplicatesAlreadyExisting += collection.duplicatesAlreadyExisting;
     totals.wouldInsert += collection.wouldInsert;
@@ -415,6 +494,10 @@ function buildTotals(collections: CollectionReport[]) {
     totals.updated += collection.updated;
     totals.errors += collection.errors.length;
     for (const [key, value] of Object.entries(collection.categoryCounts)) addCount(totals.categoryCounts, key, value);
+    for (const [key, value] of Object.entries(collection.cardCategoryCounts)) addCount(totals.cardCategoryCounts, key, value);
+    for (const [key, value] of Object.entries(collection.otherCategoryCounts)) addCount(totals.otherCategoryCounts, key, value);
+    for (const [key, value] of Object.entries(collection.assetTypeCounts)) addCount(totals.assetTypeCounts, key, value);
+    for (const [key, value] of Object.entries(collection.publicGroupCounts)) addCount(totals.publicGroupCounts, key, value);
     for (const [key, value] of Object.entries(collection.excluded)) addCount(totals.excluded, key, value);
     addCount(totals.sourceCollectionCounts, collection.collectionAddress, collection.assetsSeen);
   }
@@ -524,9 +607,15 @@ export async function ingestAllowedCollections(options: IngestAllowedCollections
           seenMints.add(candidate.mint);
 
           if (candidate.previousFilterMatched) collectionReport.previousFilterMatchedAssets += 1;
+          if (candidate.previousFilterMatchedCard) collectionReport.previousFilterMatchedCards += 1;
+          if (candidate.previousFilterMatchedOther) collectionReport.previousFilterMatchedOther += 1;
           if (candidate.category === "unknown") {
             collectionReport.unknownCategoryAssets += 1;
             addCount(collectionReport.excluded, "unknown_category");
+          }
+          if (candidate.assetType !== "card") {
+            collectionReport.hiddenOtherAssets += 1;
+            addCount(collectionReport.excluded, "other_asset_type");
           }
           if (candidate.isStaging) {
             collectionReport.stagingAssets += 1;
@@ -541,9 +630,19 @@ export async function ingestAllowedCollections(options: IngestAllowedCollections
           if (!candidate.name) addCount(collectionReport.excluded, "missing_name");
           if (!candidate.owner) addCount(collectionReport.excluded, "missing_owner");
           addCount(collectionReport.categoryCounts, candidate.category);
+          addCount(collectionReport.assetTypeCounts, candidate.assetType);
+          addCount(collectionReport.publicGroupCounts, candidate.publicGroup);
+          if (candidate.assetType === "card") addCount(collectionReport.cardCategoryCounts, candidate.category);
+          else addCount(collectionReport.otherCategoryCounts, candidate.category);
 
-          const publiclyVisible = isAllowedRwaNftCategory(candidate.category) && candidate.category !== "unknown" && !candidate.isStaging;
+          const publiclyVisible = candidate.assetType === "card" && isAllowedRwaNftCategory(candidate.category) && candidate.category !== "unknown" && !candidate.isStaging;
           if (publiclyVisible) collectionReport.visibleAfterPublicFilters += 1;
+          if (publiclyVisible && candidate.previousFilterMatched) collectionReport.previousFilterMatchedVisibleAssets += 1;
+          if (publiclyVisible && !candidate.previousFilterMatched) {
+            collectionReport.newVisibleAssetsMissedByPreviousFilter += 1;
+            if (candidate.assetType === "card") collectionReport.newVisibleCardAssetsMissedByPreviousFilter += 1;
+            else collectionReport.newVisibleOtherAssetsMissedByPreviousFilter += 1;
+          }
 
           const exists = existingAssets.has(candidate.mint);
           if (exists) {
@@ -617,11 +716,17 @@ export async function ingestAllowedCollections(options: IngestAllowedCollections
     totals,
     comparison: {
       previousFilterMatchedAssets: totals.previousFilterMatchedAssets,
+      previousFilterMatchedCards: totals.previousFilterMatchedCards,
+      previousFilterMatchedOther: totals.previousFilterMatchedOther,
+      previousFilterMatchedVisibleAssets: totals.previousFilterMatchedVisibleAssets,
       visibleAfterPublicFilters: totals.visibleAfterPublicFilters,
-      difference: totals.visibleAfterPublicFilters - totals.previousFilterMatchedAssets,
-      matchesPreviousFilterInScannedPages: totals.visibleAfterPublicFilters === totals.previousFilterMatchedAssets,
+      newVisibleAssetsMissedByPreviousFilter: totals.newVisibleAssetsMissedByPreviousFilter,
+      newVisibleCardAssetsMissedByPreviousFilter: totals.newVisibleCardAssetsMissedByPreviousFilter,
+      newVisibleOtherAssetsMissedByPreviousFilter: totals.newVisibleOtherAssetsMissedByPreviousFilter,
+      difference: totals.visibleAfterPublicFilters - totals.previousFilterMatchedVisibleAssets,
+      matchesPreviousFilterInScannedPages: totals.visibleAfterPublicFilters === totals.previousFilterMatchedVisibleAssets,
       note: compareUniverse
-        ? "previousFilterMatchedAssets reflects the older attribute-category NFT filter; visibleAfterPublicFilters reflects current public category/staging/unknown filters for scanned pages."
+        ? "previousFilterMatchedAssets reflects the older attribute-category NFT filter; visibleAfterPublicFilters now requires asset_type=card, allowed category, non-staging, and non-unknown category for scanned pages."
         : "Universe comparison disabled.",
     },
   };
@@ -656,10 +761,22 @@ export function nftDbExtendedStats() {
     visiblePublicNftCount: scalar(`
       SELECT COUNT(*) AS count FROM nft_assets
       WHERE is_staging = 0
+        AND asset_type = 'card'
         AND category IS NOT NULL
         AND category != 'unknown'
         AND category IN (${allowedPlaceholders})
     `, ...allowedParams),
+    assetTypeCounts: database.prepare("SELECT COALESCE(asset_type, 'unknown') AS asset_type, COUNT(*) AS count FROM nft_assets GROUP BY COALESCE(asset_type, 'unknown') ORDER BY count DESC").all(),
+    publicGroupCounts: database.prepare("SELECT COALESCE(public_group, CASE WHEN asset_type = 'card' THEN 'card' ELSE 'other' END) AS public_group, COUNT(*) AS count FROM nft_assets GROUP BY COALESCE(public_group, CASE WHEN asset_type = 'card' THEN 'card' ELSE 'other' END) ORDER BY count DESC").all(),
+    cardCount: scalar("SELECT COUNT(*) AS count FROM nft_assets WHERE asset_type = 'card'"),
+    otherCount: scalar("SELECT COUNT(*) AS count FROM nft_assets WHERE COALESCE(public_group, CASE WHEN asset_type = 'card' THEN 'card' ELSE 'other' END) = 'other'"),
+    sealedCount: scalar("SELECT COUNT(*) AS count FROM nft_assets WHERE asset_type = 'sealed'"),
+    comicCount: scalar("SELECT COUNT(*) AS count FROM nft_assets WHERE asset_type = 'comic'"),
+    merchCount: scalar("SELECT COUNT(*) AS count FROM nft_assets WHERE asset_type = 'merch'"),
+    unknownAssetTypeCount: scalar("SELECT COUNT(*) AS count FROM nft_assets WHERE asset_type IS NULL OR asset_type = 'unknown'"),
+    hiddenOtherNftCount: scalar("SELECT COUNT(*) AS count FROM nft_assets WHERE COALESCE(public_group, CASE WHEN asset_type = 'card' THEN 'card' ELSE 'other' END) = 'other'"),
+    hiddenStagingCount: scalar("SELECT COUNT(*) AS count FROM nft_assets WHERE is_staging = 1"),
+    hiddenUnknownCategoryCount: scalar("SELECT COUNT(*) AS count FROM nft_assets WHERE category IS NULL OR category = 'unknown'"),
     sourceCollectionCounts: database.prepare("SELECT COALESCE(source_collection, 'unknown') AS source_collection, COUNT(*) AS count FROM nft_assets GROUP BY COALESCE(source_collection, 'unknown') ORDER BY count DESC").all(),
     missingImageCount: scalar("SELECT COUNT(*) AS count FROM nft_assets WHERE image IS NULL OR image = ''"),
     missingNameCount: scalar("SELECT COUNT(*) AS count FROM nft_assets WHERE name IS NULL OR name = ''"),
@@ -680,6 +797,11 @@ export function formatIngestionSummary(report: NftUniverseIngestionReport) {
     `Helius assets seen: ${report.totals.heliusAssetsSeen}`,
     `previous filter matched assets: ${report.totals.previousFilterMatchedAssets}`,
     `visible after public filters: ${report.totals.visibleAfterPublicFilters}`,
+    `asset type counts: ${JSON.stringify(report.totals.assetTypeCounts)}`,
+    `public group counts: ${JSON.stringify(report.totals.publicGroupCounts)}`,
+    `card-only category counts: ${JSON.stringify(report.totals.cardCategoryCounts)}`,
+    `other category counts: ${JSON.stringify(report.totals.otherCategoryCounts)}`,
+    `hidden other assets: ${report.totals.hiddenOtherAssets}`,
     `would insert: ${report.totals.wouldInsert}`,
     `would update: ${report.totals.wouldUpdate}`,
     `duplicates in run skipped: ${report.totals.duplicatesWithinRunSkipped}`,

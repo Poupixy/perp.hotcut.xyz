@@ -37,6 +37,8 @@ export type NftAssetRow = {
   owner: string | null;
   collection: string | null;
   category: string | null;
+  asset_type: string | null;
+  public_group: string | null;
   attributes_json: unknown[];
   token_standard: string | null;
   interface: string | null;

@@ -21,6 +21,7 @@
     "validate:rwa-market": "tsx scripts/validate-rwa-market-tracking.ts",
     "refresh:rwa-market": "tsx src/jobs/refreshRwaNftMarketData.ts",
     "ingest:allowed-collections": "tsx scripts/ingest-allowed-collections.ts",
+    "analyze:nft-filter-diff": "tsx scripts/analyze-nft-filter-diff.ts",
     "seed:verified-sale": "tsx scripts/seed-verified-sale.ts",
     "check:verified-sales": "tsx scripts/check-verified-sales.ts",
     "test:one-nft-flow": "tsx scripts/test-one-real-nft-flow.ts",

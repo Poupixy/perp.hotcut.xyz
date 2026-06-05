@@ -47,6 +47,8 @@ function normalizeAsset(row: Partial<NftAssetRow>): NftAssetRow | null {
     owner: row.owner ?? null,
     collection: row.collection ?? null,
     category: row.category ?? row.market,
+    asset_type: row.asset_type ?? null,
+    public_group: row.public_group ?? null,
     attributes_json: Array.isArray(row.attributes_json) ? row.attributes_json : [],
     token_standard: row.token_standard ?? null,
     interface: row.interface ?? null,

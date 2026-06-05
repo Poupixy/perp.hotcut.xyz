@@ -53,6 +53,8 @@ function runNftMigrations(database: DatabaseSync) {
       owner TEXT,
       collection TEXT,
       category TEXT,
+      asset_type TEXT,
+      public_group TEXT,
       attributes_json TEXT,
       token_standard TEXT,
       interface TEXT,
@@ -139,6 +141,8 @@ function runNftMigrations(database: DatabaseSync) {
   addColumnIfMissing(database, "rwa_nft_events", "price_change_percent", "REAL");
   addColumnIfMissing(database, "rwa_nft_events", "price_change_direction", "TEXT");
   addColumnIfMissing(database, "rwa_nft_events", "price_change_calculated_at", "TEXT");
+  addColumnIfMissing(database, "nft_assets", "asset_type", "TEXT");
+  addColumnIfMissing(database, "nft_assets", "public_group", "TEXT");
   addColumnIfMissing(database, "queue_state", "ingestion_running", "INTEGER NOT NULL DEFAULT 0");
   addColumnIfMissing(database, "queue_state", "ingestion_current_collection", "TEXT");
   addColumnIfMissing(database, "queue_state", "ingestion_current_page", "INTEGER");
@@ -149,6 +153,8 @@ function runNftMigrations(database: DatabaseSync) {
   addColumnIfMissing(database, "queue_state", "latest_ingestion_report_path", "TEXT");
   addColumnIfMissing(database, "queue_state", "latest_universe_comparison_report_path", "TEXT");
   database.exec(`
+    CREATE INDEX IF NOT EXISTS idx_nft_assets_asset_type ON nft_assets(asset_type);
+    CREATE INDEX IF NOT EXISTS idx_nft_assets_public_group ON nft_assets(public_group);
     CREATE INDEX IF NOT EXISTS idx_rwa_nft_events_payment_symbol ON rwa_nft_events(payment_symbol);
     CREATE INDEX IF NOT EXISTS idx_rwa_nft_events_payment_mint ON rwa_nft_events(payment_mint);
     CREATE INDEX IF NOT EXISTS idx_rwa_nft_events_price_change_direction ON rwa_nft_events(price_change_direction);

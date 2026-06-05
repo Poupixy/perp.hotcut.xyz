@@ -24,7 +24,18 @@ function main() {
   console.log(`category counts: ${JSON.stringify(categories)}`);
   console.log(`staging NFTs count: ${scalar("SELECT COUNT(*) AS count FROM nft_assets WHERE is_staging = 1")}`);
   console.log(`unknown NFTs count: ${scalar("SELECT COUNT(*) AS count FROM nft_assets WHERE category IS NULL OR category = 'unknown'")}`);
+  console.log(`asset_type counts: ${JSON.stringify(stats.assetTypeCounts)}`);
+  console.log(`public_group counts: ${JSON.stringify(stats.publicGroupCounts)}`);
+  console.log(`card count: ${stats.cardCount}`);
+  console.log(`other count: ${stats.otherCount}`);
+  console.log(`sealed count: ${stats.sealedCount}`);
+  console.log(`comic count: ${stats.comicCount}`);
+  console.log(`merch count: ${stats.merchCount}`);
+  console.log(`unknown asset_type count: ${stats.unknownAssetTypeCount}`);
   console.log(`visible public NFT count: ${stats.visiblePublicNftCount}`);
+  console.log(`hidden other NFTs count: ${stats.hiddenOtherNftCount}`);
+  console.log(`hidden staging count: ${stats.hiddenStagingCount}`);
+  console.log(`hidden unknown category count: ${stats.hiddenUnknownCategoryCount}`);
   console.log(`source_collection counts: ${JSON.stringify(stats.sourceCollectionCounts)}`);
   console.log(`NFTs missing image: ${stats.missingImageCount}`);
   console.log(`NFTs missing name: ${stats.missingNameCount}`);
