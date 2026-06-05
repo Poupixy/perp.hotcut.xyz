@@ -18,6 +18,25 @@ npm run check:verified-sales
 
 After `seed:verified-sale` is run with a mint that already exists in `nft_assets`, the sale is inserted into `rwa_nft_events`, the current NFT state in `nft_assets` is updated, and `/verified-sales` displays one confirmed SALE event.
 
+## First Real NFT Test
+
+Use this flow before ingesting larger Collector Crypt or Phygitals datasets. It tracks one explicit real mint, fetches its metadata from Helius, then seeds one manual verified sale.
+
+```bash
+npm run test:one-nft-flow -- --mint=<real_nft_mint> --market=pokemon --label="First real NFT test" --priceSol=1 --tx=TEST_SIGNATURE_FIRST_VERIFIED_SALE_001 --marketplace=manual
+npm run validate:nft-db
+npm run check:verified-sales
+```
+
+Expected result:
+
+- `nft_assets` should be at least `1`.
+- `tracked_nfts` should be at least `1`.
+- Verified sales should be at least `1`.
+- `/verified-sales` should display the seeded sale.
+
+Do not run full collection ingestion for this test.
+
 ## Safety Rules
 
 - The seed command refuses unknown mints.

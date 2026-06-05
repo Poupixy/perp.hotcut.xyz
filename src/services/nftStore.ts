@@ -88,13 +88,16 @@ function isStagingAsset(asset: Pick<NftAssetRow, "name" | "collection" | "source
 }
 
 function assetCategory(asset: NormalizedNftAsset, raw?: unknown) {
-  return asset.category ?? detectRwaNftCategory({
+  if (asset.category && asset.category !== "unknown") return asset.category;
+  const detected = detectRwaNftCategory({
     name: asset.name,
     description: asset.description,
     collection: asset.collection,
     attributes: asset.attributes,
     attributes_json: Array.isArray(raw) ? raw : asset.attributes,
   });
+  if (detected !== "unknown") return detected;
+  return isValidMarket(asset.market) ? asset.market : "unknown";
 }
 
 function upsertTracked(row: TrackedNftRow) {

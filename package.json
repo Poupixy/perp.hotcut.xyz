@@ -21,7 +21,8 @@
     "validate:rwa-market": "tsx scripts/validate-rwa-market-tracking.ts",
     "refresh:rwa-market": "tsx src/jobs/refreshRwaNftMarketData.ts",
     "seed:verified-sale": "tsx scripts/seed-verified-sale.ts",
-    "check:verified-sales": "tsx scripts/check-verified-sales.ts"
+    "check:verified-sales": "tsx scripts/check-verified-sales.ts",
+    "test:one-nft-flow": "tsx scripts/test-one-real-nft-flow.ts"
   },
   "dependencies": {
     "@cloudflare/vite-plugin": "^1.25.5",
