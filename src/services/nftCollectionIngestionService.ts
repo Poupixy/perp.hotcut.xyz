@@ -14,6 +14,7 @@ type RuntimeEnv = Record<string, string | undefined>;
 
 export type IngestAllowedCollectionsOptions = {
   dryRun?: boolean;
+  countOnly?: boolean;
   limitPages?: number | null;
   limitAssets?: number | null;
   collection?: string | null;
@@ -92,9 +93,12 @@ type CollectionReport = {
 
 export type NftUniverseIngestionReport = {
   dryRun: boolean;
+  countOnly: boolean;
   compareUniverse: boolean;
   startedAt: string;
   finishedAt: string;
+  durationMs: number;
+  duration: string;
   options: Required<Omit<IngestAllowedCollectionsOptions, "collection" | "limitAssets" | "limitPages">> & {
     collection: string | null;
     limitAssets: number | null;
@@ -521,7 +525,8 @@ export function getLatestNftUniverseComparisonReportPath() {
 }
 
 export async function ingestAllowedCollections(options: IngestAllowedCollectionsOptions = {}): Promise<NftUniverseIngestionReport> {
-  const dryRun = options.dryRun ?? true;
+  const countOnly = options.countOnly ?? false;
+  const dryRun = countOnly ? true : options.dryRun ?? true;
   const delayMs = Math.max(Math.trunc(options.delayMs ?? 30_000), 0);
   const pageLimit = DEFAULT_PAGE_LIMIT;
   const limitPages = options.limitPages ?? null;
@@ -531,6 +536,7 @@ export async function ingestAllowedCollections(options: IngestAllowedCollections
   const compareUniverse = options.compareUniverse ?? true;
   const resume = options.resume ?? true;
   const startedAt = nowIso();
+  const startedMs = Date.now();
   const existingAssets = loadExistingAssets();
   const seenMints = new Set<string>();
 
@@ -693,11 +699,15 @@ export async function ingestAllowedCollections(options: IngestAllowedCollections
 
   const reportWithoutPath = {
     dryRun,
+    countOnly,
     compareUniverse,
     startedAt,
     finishedAt: nowIso(),
+    durationMs: Date.now() - startedMs,
+    duration: `${((Date.now() - startedMs) / 1000).toFixed(1)}s`,
     options: {
       dryRun,
+      countOnly,
       delayMs,
       resume,
       includeStaging,
@@ -731,7 +741,7 @@ export async function ingestAllowedCollections(options: IngestAllowedCollections
     },
   };
 
-  const prefix = dryRun && compareUniverse ? "nft-universe-dryrun" : "nft-ingestion";
+  const prefix = countOnly ? "nft-universe-count" : dryRun && compareUniverse ? "nft-universe-dryrun" : "nft-ingestion";
   const report = writeReport(reportWithoutPath, prefix);
   if (!dryRun) updateIngestionState({
     running: false,
@@ -789,14 +799,24 @@ export function nftDbExtendedStats() {
 
 export function formatIngestionSummary(report: NftUniverseIngestionReport) {
   return [
+    report.countOnly ? "NFT universe full count:" : "NFT universe dry run:",
     `dryRun: ${report.dryRun}`,
+    `countOnly: ${report.countOnly}`,
     `report: ${report.reportPath}`,
+    `duration: ${report.duration}`,
     `allowlisted collections: ${report.allowlistedCollections.length}`,
     `collections processed: ${report.totals.collectionsProcessed}`,
     `pages processed: ${report.totals.pagesProcessed}`,
-    `Helius assets seen: ${report.totals.heliusAssetsSeen}`,
-    `previous filter matched assets: ${report.totals.previousFilterMatchedAssets}`,
-    `visible after public filters: ${report.totals.visibleAfterPublicFilters}`,
+    `Total assets: ${report.totals.heliusAssetsSeen}`,
+    `Cards: ${report.totals.assetTypeCounts.card ?? 0}`,
+    `Sealed: ${report.totals.assetTypeCounts.sealed ?? 0}`,
+    `Comics: ${report.totals.assetTypeCounts.comic ?? 0}`,
+    `Merch: ${report.totals.assetTypeCounts.merch ?? 0}`,
+    `Unknown type: ${report.totals.assetTypeCounts.unknown ?? 0}`,
+    `Public visible cards: ${report.totals.visibleAfterPublicFilters}`,
+    `Hidden other: ${report.totals.hiddenOtherAssets}`,
+    `Old filter matched: ${report.totals.previousFilterMatchedAssets}`,
+    `Difference vs old filter: ${report.comparison.difference}`,
     `asset type counts: ${JSON.stringify(report.totals.assetTypeCounts)}`,
     `public group counts: ${JSON.stringify(report.totals.publicGroupCounts)}`,
     `card-only category counts: ${JSON.stringify(report.totals.cardCategoryCounts)}`,

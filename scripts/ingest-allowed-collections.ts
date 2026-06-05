@@ -22,9 +22,11 @@ function numberArg(name: string): number | null {
 }
 
 async function main() {
+  const maxPages = numberArg("--maxPages");
   const report = await ingestAllowedCollections({
     dryRun: boolArg("--dryRun", true),
-    limitPages: numberArg("--limitPages"),
+    countOnly: boolArg("--countOnly", false),
+    limitPages: numberArg("--limitPages") ?? maxPages,
     limitAssets: numberArg("--limitAssets"),
     collection: arg("--collection") ?? null,
     delayMs: numberArg("--delayMs") ?? 30_000,
@@ -37,6 +39,8 @@ async function main() {
   console.log(formatIngestionSummary(report));
   console.log(JSON.stringify({
     reportPath: report.reportPath,
+    countOnly: report.countOnly,
+    duration: report.duration,
     totals: report.totals,
     comparison: report.comparison,
     collections: report.collections.map((collection) => ({
