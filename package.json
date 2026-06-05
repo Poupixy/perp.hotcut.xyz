@@ -23,7 +23,8 @@
     "seed:verified-sale": "tsx scripts/seed-verified-sale.ts",
     "check:verified-sales": "tsx scripts/check-verified-sales.ts",
     "test:one-nft-flow": "tsx scripts/test-one-real-nft-flow.ts",
-    "enrich:sale-from-tx": "tsx scripts/enrich-sale-from-tx.ts"
+    "enrich:sale-from-tx": "tsx scripts/enrich-sale-from-tx.ts",
+    "backfill:verified-sales": "tsx scripts/backfill-verified-sales-dry-run.ts"
   },
   "dependencies": {
     "@cloudflare/vite-plugin": "^1.25.5",
