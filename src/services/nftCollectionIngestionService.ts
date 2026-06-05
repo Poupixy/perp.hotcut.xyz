@@ -737,6 +737,7 @@ export async function ingestAllowedCollections(options: IngestAllowedCollections
         if (debugPagination) {
           console.log(`[PAGINATION DEBUG] collection=${collection.label} page=${page} limit=${pageLimit} result.total=${result.total ?? "null"} items=${result.items.length} cumulative=${collectionReport.assetsSeen}`);
         }
+        console.log(`[COLLECTION INGESTION] Progress collection=${collection.label} page=${page} pageAssets=${result.items.length} collectionAssets=${collectionReport.assetsSeen} globalAssets=${totalProcessedAssets} cards=${collectionReport.assetTypeCounts.card ?? 0} sealed=${collectionReport.assetTypeCounts.sealed ?? 0} comics=${collectionReport.assetTypeCounts.comic ?? 0} merch=${collectionReport.assetTypeCounts.merch ?? 0} unknown=${collectionReport.assetTypeCounts.unknown ?? 0} publicVisibleCards=${collectionReport.visibleAfterPublicFilters}`);
 
         if (result.items.length === 0) {
           debugEntry.stopCondition = "items.length === 0";
