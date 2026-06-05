@@ -26,7 +26,7 @@ export type IngestAllowedCollectionsOptions = {
   compareUniverse?: boolean;
 };
 
-type HeliusPage = {
+export type HeliusPage = {
   items: unknown[];
   total: number | null;
   page: number | null;
@@ -48,7 +48,7 @@ type PaginationDebugEntry = {
   stopCondition: string | null;
 };
 
-type AssetCandidate = {
+export type AssetCandidate = {
   mint: string;
   name: string | null;
   description: string | null;
@@ -241,7 +241,7 @@ function normalizeCollectionKey(collection: TargetNftCollectionConfig) {
   return `${slug(collection.label)}-${collection.collectionAddress.slice(0, 8)}`;
 }
 
-function normalizeAsset(raw: unknown, collection: TargetNftCollectionConfig): AssetCandidate | null {
+export function normalizeNftUniverseAsset(raw: unknown, collection: TargetNftCollectionConfig): AssetCandidate | null {
   const record = asRecord(raw);
   const content = asRecord(record.content);
   const metadata = asRecord(content.metadata);
@@ -303,7 +303,7 @@ function normalizeAsset(raw: unknown, collection: TargetNftCollectionConfig): As
   };
 }
 
-async function heliusAssetsPage(collectionAddress: string, page: number, limit: number): Promise<HeliusPage> {
+export async function heliusAssetsPage(collectionAddress: string, page: number, limit: number): Promise<HeliusPage> {
   const apiKey = env().HELIUS_API_KEY;
   if (!apiKey) throw new Error("Missing HELIUS_API_KEY");
 
@@ -645,7 +645,7 @@ export async function ingestAllowedCollections(options: IngestAllowedCollections
           collectionReport.assetsSeen += 1;
           totalProcessedAssets += 1;
 
-          const candidate = normalizeAsset(raw, collection);
+          const candidate = normalizeNftUniverseAsset(raw, collection);
           if (!candidate) {
             addCount(collectionReport.excluded, "missing_mint");
             continue;
