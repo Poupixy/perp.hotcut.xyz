@@ -24,6 +24,7 @@ import { Route as ApiRwaMarketStatsRouteImport } from './routes/api.rwa-market.s
 import { Route as ApiRwaMarketListedRouteImport } from './routes/api.rwa-market.listed'
 import { Route as ApiRwaMarketLatestSalesRouteImport } from './routes/api.rwa-market.latest-sales'
 import { Route as ApiRwaMarketEventsRouteImport } from './routes/api.rwa-market.events'
+import { Route as ApiRwaMarketEnrichSaleRouteImport } from './routes/api.rwa-market.enrich-sale'
 import { Route as ApiProvidersStatusRouteImport } from './routes/api.providers.status'
 import { Route as ApiNftsUntrackRouteImport } from './routes/api.nfts.untrack'
 import { Route as ApiNftsTrackedRouteImport } from './routes/api.nfts.tracked'
@@ -111,6 +112,11 @@ const ApiRwaMarketLatestSalesRoute = ApiRwaMarketLatestSalesRouteImport.update({
 const ApiRwaMarketEventsRoute = ApiRwaMarketEventsRouteImport.update({
   id: '/api/rwa-market/events',
   path: '/api/rwa-market/events',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiRwaMarketEnrichSaleRoute = ApiRwaMarketEnrichSaleRouteImport.update({
+  id: '/api/rwa-market/enrich-sale',
+  path: '/api/rwa-market/enrich-sale',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiProvidersStatusRoute = ApiProvidersStatusRouteImport.update({
@@ -205,6 +211,7 @@ export interface FileRoutesByFullPath {
   '/api/nfts/tracked': typeof ApiNftsTrackedRoute
   '/api/nfts/untrack': typeof ApiNftsUntrackRoute
   '/api/providers/status': typeof ApiProvidersStatusRoute
+  '/api/rwa-market/enrich-sale': typeof ApiRwaMarketEnrichSaleRoute
   '/api/rwa-market/events': typeof ApiRwaMarketEventsRoute
   '/api/rwa-market/latest-sales': typeof ApiRwaMarketLatestSalesRoute
   '/api/rwa-market/listed': typeof ApiRwaMarketListedRoute
@@ -235,6 +242,7 @@ export interface FileRoutesByTo {
   '/api/nfts/tracked': typeof ApiNftsTrackedRoute
   '/api/nfts/untrack': typeof ApiNftsUntrackRoute
   '/api/providers/status': typeof ApiProvidersStatusRoute
+  '/api/rwa-market/enrich-sale': typeof ApiRwaMarketEnrichSaleRoute
   '/api/rwa-market/events': typeof ApiRwaMarketEventsRoute
   '/api/rwa-market/latest-sales': typeof ApiRwaMarketLatestSalesRoute
   '/api/rwa-market/listed': typeof ApiRwaMarketListedRoute
@@ -267,6 +275,7 @@ export interface FileRoutesById {
   '/api/nfts/tracked': typeof ApiNftsTrackedRoute
   '/api/nfts/untrack': typeof ApiNftsUntrackRoute
   '/api/providers/status': typeof ApiProvidersStatusRoute
+  '/api/rwa-market/enrich-sale': typeof ApiRwaMarketEnrichSaleRoute
   '/api/rwa-market/events': typeof ApiRwaMarketEventsRoute
   '/api/rwa-market/latest-sales': typeof ApiRwaMarketLatestSalesRoute
   '/api/rwa-market/listed': typeof ApiRwaMarketListedRoute
@@ -299,6 +308,7 @@ export interface FileRouteTypes {
     | '/api/nfts/tracked'
     | '/api/nfts/untrack'
     | '/api/providers/status'
+    | '/api/rwa-market/enrich-sale'
     | '/api/rwa-market/events'
     | '/api/rwa-market/latest-sales'
     | '/api/rwa-market/listed'
@@ -329,6 +339,7 @@ export interface FileRouteTypes {
     | '/api/nfts/tracked'
     | '/api/nfts/untrack'
     | '/api/providers/status'
+    | '/api/rwa-market/enrich-sale'
     | '/api/rwa-market/events'
     | '/api/rwa-market/latest-sales'
     | '/api/rwa-market/listed'
@@ -360,6 +371,7 @@ export interface FileRouteTypes {
     | '/api/nfts/tracked'
     | '/api/nfts/untrack'
     | '/api/providers/status'
+    | '/api/rwa-market/enrich-sale'
     | '/api/rwa-market/events'
     | '/api/rwa-market/latest-sales'
     | '/api/rwa-market/listed'
@@ -387,6 +399,7 @@ export interface RootRouteChildren {
   ApiNftsTrackedRoute: typeof ApiNftsTrackedRoute
   ApiNftsUntrackRoute: typeof ApiNftsUntrackRoute
   ApiProvidersStatusRoute: typeof ApiProvidersStatusRoute
+  ApiRwaMarketEnrichSaleRoute: typeof ApiRwaMarketEnrichSaleRoute
   ApiRwaMarketEventsRoute: typeof ApiRwaMarketEventsRoute
   ApiRwaMarketLatestSalesRoute: typeof ApiRwaMarketLatestSalesRoute
   ApiRwaMarketListedRoute: typeof ApiRwaMarketListedRoute
@@ -506,6 +519,13 @@ declare module '@tanstack/react-router' {
       path: '/api/rwa-market/events'
       fullPath: '/api/rwa-market/events'
       preLoaderRoute: typeof ApiRwaMarketEventsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/rwa-market/enrich-sale': {
+      id: '/api/rwa-market/enrich-sale'
+      path: '/api/rwa-market/enrich-sale'
+      fullPath: '/api/rwa-market/enrich-sale'
+      preLoaderRoute: typeof ApiRwaMarketEnrichSaleRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/providers/status': {
@@ -661,6 +681,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiNftsTrackedRoute: ApiNftsTrackedRoute,
   ApiNftsUntrackRoute: ApiNftsUntrackRoute,
   ApiProvidersStatusRoute: ApiProvidersStatusRoute,
+  ApiRwaMarketEnrichSaleRoute: ApiRwaMarketEnrichSaleRoute,
   ApiRwaMarketEventsRoute: ApiRwaMarketEventsRoute,
   ApiRwaMarketLatestSalesRoute: ApiRwaMarketLatestSalesRoute,
   ApiRwaMarketListedRoute: ApiRwaMarketListedRoute,

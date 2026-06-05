@@ -11,6 +11,23 @@ function rows(sql: string, ...params: unknown[]) {
   return getNftDb().prepare(sql).all(...params);
 }
 
+function hasValue(value: unknown) {
+  return value !== null && value !== undefined && String(value).trim() !== "";
+}
+
+function completenessScore(row: Record<string, unknown>) {
+  return [
+    hasValue(row.tx_signature) && !String(row.tx_signature).startsWith("TEST_SIGNATURE"),
+    hasValue(row.buyer),
+    hasValue(row.seller),
+    typeof row.price_sol === "number",
+    hasValue(row.marketplace),
+    hasValue(row.event_at),
+    hasValue(row.image),
+    hasValue(row.name),
+  ].filter(Boolean).length;
+}
+
 async function main() {
   const allowedPlaceholders = ALLOWED_RWA_NFT_CATEGORIES.map(() => "?").join(", ");
   const allowedParams = [...ALLOWED_RWA_NFT_CATEGORIES];
@@ -62,10 +79,13 @@ async function main() {
       events.mint,
       events.category,
       assets.name,
+      assets.image,
       events.price_sol,
       events.price_usd,
       events.marketplace,
       events.tx_signature,
+      events.buyer,
+      events.seller,
       events.event_at,
       events.source
     FROM rwa_nft_events events
@@ -75,16 +95,38 @@ async function main() {
     LIMIT 10
   `);
 
-  console.log(JSON.stringify({
-    totalSaleEvents: scalar("SELECT COUNT(*) AS count FROM rwa_nft_events WHERE event_type = 'SALE'"),
-    totalVerifiedSalesVisible: scalar(`
+  const totalVisibleSales = scalar(`
       SELECT COUNT(*) AS count
       FROM rwa_nft_events events
       JOIN nft_assets assets ON assets.mint = events.mint
       WHERE ${visibleWhere}
+    `, ...allowedParams);
+
+  console.log(JSON.stringify({
+    totalSaleEvents: scalar("SELECT COUNT(*) AS count FROM rwa_nft_events WHERE event_type = 'SALE'"),
+    totalVisibleSales,
+    totalVerifiedSalesVisible: totalVisibleSales,
+    manualTestSales: scalar(`
+      SELECT COUNT(*) AS count
+      FROM rwa_nft_events events
+      JOIN nft_assets assets ON assets.mint = events.mint
+      WHERE ${visibleWhere}
+        AND (events.source = 'manual' OR events.tx_signature LIKE 'TEST_SIGNATURE%')
     `, ...allowedParams),
+    onChainVerifiedSales: scalar(`
+      SELECT COUNT(*) AS count
+      FROM rwa_nft_events events
+      JOIN nft_assets assets ON assets.mint = events.mint
+      WHERE ${visibleWhere}
+        AND events.source IN ('helius_enhanced_tx', 'helius_webhook', 'magiceden', 'tensor')
+        AND events.tx_signature NOT LIKE 'TEST_SIGNATURE%'
+    `, ...allowedParams),
+    salesMissingBuyer: scalar(`SELECT COUNT(*) AS count FROM rwa_nft_events WHERE event_type = 'SALE' AND tx_signature IS NOT NULL AND buyer IS NULL`),
+    salesMissingSeller: scalar(`SELECT COUNT(*) AS count FROM rwa_nft_events WHERE event_type = 'SALE' AND tx_signature IS NOT NULL AND seller IS NULL`),
+    salesMissingUsd: scalar(`SELECT COUNT(*) AS count FROM rwa_nft_events WHERE event_type = 'SALE' AND tx_signature IS NOT NULL AND price_usd IS NULL`),
+    salesWithTestTxSignatures: scalar(`SELECT COUNT(*) AS count FROM rwa_nft_events WHERE event_type = 'SALE' AND tx_signature LIKE 'TEST_SIGNATURE%'`),
     latest10VisibleVerifiedSales: visible.sales,
-    latest10SaleEvents: latest,
+    latest10SaleEvents: latest.map((row) => ({ ...row, completenessScore: completenessScore(row) })),
     excluded,
   }, null, 2));
 }

@@ -37,6 +37,38 @@ Expected result:
 
 Do not run full collection ingestion for this test.
 
+## Why Verified Sales Can Show Missing Data
+
+Manual seeded sales are only for UI and pipeline testing. They prove that `nft_assets`, `rwa_nft_events`, `/api/verified-sales`, and `/verified-sales` are connected, but they do not contain real buyer, seller, USD price, marketplace, or blockchain timestamp unless those values are explicitly supplied.
+
+Buyer, seller, USD price, marketplace, and real sale timestamp require a trusted source:
+
+- Helius Enhanced Transactions for real Solana transaction signatures.
+- Marketplace APIs later, when provider endpoints are configured.
+
+Use this command with a real Solana sale transaction signature to enrich a sale from on-chain data:
+
+```bash
+npm run enrich:sale-from-tx -- --tx=<real_solana_sale_transaction_signature>
+```
+
+Optional matching arguments:
+
+```bash
+npm run enrich:sale-from-tx -- --tx=<real_solana_sale_transaction_signature> --mint=<mint> --market=pokemon --force=true
+```
+
+`--mint` is only used for matching when the transaction parser cannot detect the mint. It does not create fake buyer, seller, price, or marketplace values.
+
+The API equivalent is disabled unless `RWA_MARKET_ADMIN_SECRET` is configured:
+
+```bash
+curl -X POST https://perp.hotcut.xyz/api/rwa-market/enrich-sale \
+  -H "content-type: application/json" \
+  -H "x-admin-secret: <secret>" \
+  -d '{"txSignature":"<real_solana_sale_transaction_signature>"}'
+```
+
 ## Safety Rules
 
 - The seed command refuses unknown mints.

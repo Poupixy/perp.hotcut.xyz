@@ -48,7 +48,7 @@ function fmtSol(value: number | null) {
 }
 
 function fmtUsd(value: number | null) {
-  return typeof value === "number" ? `$${value.toLocaleString("en-US", { maximumFractionDigits: 2 })}` : "--";
+  return typeof value === "number" ? `$${value.toLocaleString("en-US", { maximumFractionDigits: 2 })}` : "USD not available";
 }
 
 function short(value: string | null | undefined) {
@@ -57,11 +57,23 @@ function short(value: string | null | undefined) {
 }
 
 function sourceLabel(source: string) {
+  if (source === "helius_enhanced_tx" || source === "helius_webhook") return "Helius verified";
+  if (source === "magiceden") return "Magic Eden verified";
+  if (source === "tensor") return "Tensor verified";
+  if (source === "manual") return "Manual verified";
   return SOURCE_OPTIONS.find(([value]) => value === source)?.[1] ?? source;
 }
 
 function categoryLabel(category: string) {
   return CATEGORY_OPTIONS.find(([value]) => value === category)?.[1] ?? category;
+}
+
+function isTestSale(sale: VerifiedSale) {
+  return sale.txSignature.startsWith("TEST_SIGNATURE");
+}
+
+function isManualSale(sale: VerifiedSale) {
+  return sale.source === "manual" || sale.marketplace === "manual";
 }
 
 export function VerifiedSalesPage() {
@@ -188,13 +200,16 @@ export function VerifiedSalesPage() {
                 <td className="px-5 py-3 text-right font-mono font-semibold tabular-nums">{fmtSol(sale.priceSol)}</td>
                 <td className="px-5 py-3 text-right font-mono tabular-nums text-muted-foreground">{fmtUsd(sale.priceUsd)}</td>
                 <td className="px-5 py-3">
-                  <div>{sale.marketplace ?? "--"}</div>
-                  <div className="text-[11px] text-muted-foreground">{sourceLabel(sale.source)}</div>
+                  <div>{isManualSale(sale) ? "Manual verified" : sale.marketplace ?? "--"}</div>
+                  <div className="mt-1 flex flex-wrap gap-1.5 text-[11px] text-muted-foreground">
+                    <span>{sourceLabel(sale.source)}</span>
+                    {isTestSale(sale) && <span className="rounded border border-primary/30 bg-primary/10 px-1.5 py-0.5 text-primary">Test sale</span>}
+                  </div>
                 </td>
                 <td className="px-5 py-3 font-mono text-xs text-muted-foreground">{short(sale.txSignature)}</td>
                 <td className="px-5 py-3 text-xs text-muted-foreground">
-                  <div>Buyer: <span className="font-mono">{short(sale.buyer)}</span></div>
-                  <div>Seller: <span className="font-mono">{short(sale.seller)}</span></div>
+                  <div>Buyer: <span className="font-mono">{sale.buyer ? short(sale.buyer) : "unknown"}</span></div>
+                  <div>Seller: <span className="font-mono">{sale.seller ? short(sale.seller) : "unknown"}</span></div>
                 </td>
                 <td className="px-5 py-3 text-right text-xs text-muted-foreground"><RelativeTime iso={sale.eventAt} /></td>
               </tr>

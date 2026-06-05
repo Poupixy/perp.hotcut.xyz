@@ -16,6 +16,7 @@ services:
       - NFT_SQLITE_DB_PATH=${NFT_SQLITE_DB_PATH:-/app/data/perp-rwa.sqlite}
       - STORE_RAW_HELIUS_JSON=${STORE_RAW_HELIUS_JSON:-false}
       - HELIUS_WEBHOOK_SECRET=${HELIUS_WEBHOOK_SECRET:-}
+      - RWA_MARKET_ADMIN_SECRET=${RWA_MARKET_ADMIN_SECRET:-}
     ports:
       - "127.0.0.1:3002:3000"
     volumes:

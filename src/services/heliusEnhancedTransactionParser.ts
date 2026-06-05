@@ -1,5 +1,9 @@
 import type { RwaNftMarketEvent, RwaNftMarketEventType } from "@/types/rwaNftMarket";
 
+type ParseOptions = {
+  fallbackMint?: string | null;
+};
+
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
@@ -12,6 +16,15 @@ function asNumber(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
+function numberFromUnknown(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
 function firstString(...values: unknown[]) {
   for (const value of values) {
     const result = asString(value);
@@ -20,10 +33,8 @@ function firstString(...values: unknown[]) {
   return null;
 }
 
-function nestedString(row: Record<string, unknown>, path: string[]) {
-  let current: unknown = row;
-  for (const key of path) current = asRecord(current)[key];
-  return asString(current);
+function recordArray(value: unknown): Record<string, unknown>[] {
+  return Array.isArray(value) ? value.map(asRecord) : [];
 }
 
 function detectEventType(tx: Record<string, unknown>): RwaNftMarketEventType | null {
@@ -36,7 +47,7 @@ function detectEventType(tx: Record<string, unknown>): RwaNftMarketEventType | n
   return null;
 }
 
-function nftMintFromTx(tx: Record<string, unknown>) {
+function nftMintFromTx(tx: Record<string, unknown>, fallbackMint?: string | null) {
   const nftEvent = asRecord(tx.nft);
   const events = asRecord(tx.events);
   const nft = asRecord(events.nft);
@@ -53,15 +64,26 @@ function nftMintFromTx(tx: Record<string, unknown>) {
     nfts[0]?.mint,
     nfts[0]?.assetMint,
     transfers.find((transfer) => asString(transfer.mint))?.mint,
+    fallbackMint,
   );
 }
 
 function solAmount(tx: Record<string, unknown>) {
   const events = asRecord(tx.events);
   const nft = asRecord(events.nft);
-  const amount = firstString(tx.amount, tx.price, nft.amount, nft.price);
-  const numeric = typeof amount === "string" ? Number(amount) : asNumber(amount);
-  if (typeof numeric === "number" && Number.isFinite(numeric)) return numeric > 10_000 ? numeric / 1_000_000_000 : numeric;
+  const nativeTransfers = recordArray(tx.nativeTransfers);
+  const nftAmount = numberFromUnknown(nft.amount ?? nft.price);
+  if (typeof nftAmount === "number") return nftAmount > 100_000 ? nftAmount / 1_000_000_000 : nftAmount;
+
+  const amount = numberFromUnknown(tx.amount ?? tx.price);
+  if (typeof amount === "number") return amount > 100_000 ? amount / 1_000_000_000 : amount;
+
+  const largestTransfer = nativeTransfers
+    .map((transfer) => numberFromUnknown(transfer.amount))
+    .filter((value): value is number => typeof value === "number")
+    .sort((a, b) => b - a)[0];
+  if (typeof largestTransfer === "number") return largestTransfer > 100_000 ? largestTransfer / 1_000_000_000 : largestTransfer;
+
   return asNumber(tx.priceSol) ?? asNumber(nft.priceSol) ?? null;
 }
 
@@ -71,7 +93,37 @@ function timestampFromTx(tx: Record<string, unknown>) {
   return asString(raw) ?? new Date().toISOString();
 }
 
-export function parseHeliusEnhancedTransaction(txPayload: unknown): RwaNftMarketEvent[] {
+function buyerSellerFromTransfers(tx: Record<string, unknown>) {
+  const events = asRecord(tx.events);
+  const nft = asRecord(events.nft);
+  const nativeTransfers = recordArray(tx.nativeTransfers);
+  const tokenTransfers = recordArray(tx.tokenTransfers);
+  const nftTransfer = tokenTransfers.find((transfer) => asString(transfer.mint));
+  const largestNativeTransfer = nativeTransfers
+    .filter((transfer) => numberFromUnknown(transfer.amount) !== null)
+    .sort((a, b) => (numberFromUnknown(b.amount) ?? 0) - (numberFromUnknown(a.amount) ?? 0))[0];
+
+  return {
+    buyer: firstString(
+      tx.buyer,
+      nft.buyer,
+      nft.buyerAddress,
+      nftTransfer?.toUserAccount,
+      nftTransfer?.toTokenAccount,
+      largestNativeTransfer?.toUserAccount,
+    ),
+    seller: firstString(
+      tx.seller,
+      nft.seller,
+      nft.sellerAddress,
+      nftTransfer?.fromUserAccount,
+      nftTransfer?.fromTokenAccount,
+      largestNativeTransfer?.fromUserAccount,
+    ),
+  };
+}
+
+export function parseHeliusEnhancedTransaction(txPayload: unknown, options: ParseOptions = {}): RwaNftMarketEvent[] {
   const rows = Array.isArray(txPayload) ? txPayload.map(asRecord) : [asRecord(txPayload)];
   const events: RwaNftMarketEvent[] = [];
 
@@ -79,14 +131,13 @@ export function parseHeliusEnhancedTransaction(txPayload: unknown): RwaNftMarket
     const eventType = detectEventType(tx);
     if (!eventType) continue;
 
-    const mint = nftMintFromTx(tx);
+    const mint = nftMintFromTx(tx, options.fallbackMint);
     if (!mint) continue;
 
     const heliusEvents = asRecord(tx.events);
     const nft = asRecord(heliusEvents.nft);
     const marketplace = firstString(tx.source, tx.marketplace, nft.source, nft.marketplace);
-    const buyer = firstString(tx.buyer, nft.buyer, nft.buyerAddress, nestedString(tx, ["nativeTransfers", "0", "toUserAccount"]));
-    const seller = firstString(tx.seller, nft.seller, nft.sellerAddress, nestedString(tx, ["nativeTransfers", "0", "fromUserAccount"]));
+    const { buyer, seller } = buyerSellerFromTransfers(tx);
     const owner = firstString(tx.owner, tx.toUserAccount, buyer);
 
     events.push({

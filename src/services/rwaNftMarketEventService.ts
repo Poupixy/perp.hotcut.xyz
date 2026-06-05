@@ -86,9 +86,10 @@ export async function updateNftAssetFromMarketEvent(event: RwaNftMarketEvent): P
         last_sale_at = ?,
         last_sale_marketplace = ?,
         last_sale_tx_signature = ?,
+        owner = COALESCE(?, owner),
         market_updated_at = ?
       WHERE mint = ?
-    `).run(event.priceSol, event.priceUsd, event.eventAt, event.marketplace, event.txSignature, timestamp, event.mint);
+    `).run(event.priceSol, event.priceUsd, event.eventAt, event.marketplace, event.txSignature, event.owner, timestamp, event.mint);
     return;
   }
 
