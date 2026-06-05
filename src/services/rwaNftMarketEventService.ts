@@ -319,10 +319,14 @@ export async function getVerifiedSales(filters: MarketEventFilters = {}): Promis
       ? "events.price_sol IS NULL ASC, events.price_sol DESC, events.event_at DESC"
       : filters.sort === "price_sol_low" || filters.sort === "price_asc"
         ? "events.price_sol IS NULL ASC, events.price_sol ASC, events.event_at DESC"
-        : filters.sort === "price_usd_high"
-          ? "events.price_usd IS NULL ASC, events.price_usd DESC, events.event_at DESC"
-          : filters.sort === "price_usd_low"
-            ? "events.price_usd IS NULL ASC, events.price_usd ASC, events.event_at DESC"
+    : filters.sort === "price_usd_high"
+      ? "events.price_usd IS NULL ASC, events.price_usd DESC, events.event_at DESC"
+      : filters.sort === "price_usd_low"
+        ? "events.price_usd IS NULL ASC, events.price_usd ASC, events.event_at DESC"
+        : filters.sort === "growth_high"
+          ? "events.price_change_percent IS NULL ASC, events.price_change_percent DESC, events.event_at DESC"
+          : filters.sort === "growth_low"
+            ? "events.price_change_percent IS NULL ASC, events.price_change_percent ASC, events.event_at DESC"
             : "events.event_at DESC";
 
   const totalRow = getNftDb().prepare(`
@@ -337,6 +341,8 @@ export async function getVerifiedSales(filters: MarketEventFilters = {}): Promis
     SELECT
       events.id, events.mint, events.category, events.price_sol, events.price_usd,
       events.payment_mint, events.payment_symbol, events.payment_amount, events.marketplace,
+      events.previous_sale_amount, events.previous_sale_symbol, events.previous_sale_tx_signature,
+      events.price_change_amount, events.price_change_percent, events.price_change_direction,
       events.tx_signature, events.buyer, events.seller, events.event_at, events.source, events.raw_payload_json,
       assets.name, assets.image, assets.collection, assets.owner,
       assets.last_sale_price_sol, assets.last_sale_at, assets.last_sale_marketplace
@@ -360,6 +366,12 @@ export async function getVerifiedSales(filters: MarketEventFilters = {}): Promis
       paymentMint: asString(row.payment_mint),
       paymentSymbol: asString(row.payment_symbol),
       paymentAmount: asNumber(row.payment_amount),
+      previousSaleAmount: asNumber(row.previous_sale_amount),
+      previousSaleSymbol: asString(row.previous_sale_symbol),
+      previousSaleTxSignature: asString(row.previous_sale_tx_signature),
+      priceChangeAmount: asNumber(row.price_change_amount),
+      priceChangePercent: asNumber(row.price_change_percent),
+      priceChangeDirection: asString(row.price_change_direction) as VerifiedSale["priceChangeDirection"],
       marketplace: asString(row.marketplace),
       txSignature: String(row.tx_signature),
       buyer: asString(row.buyer),
@@ -434,6 +446,12 @@ export function marketEventFromDbRow(row: Record<string, unknown>) {
     paymentMint: asString(row.payment_mint),
     paymentSymbol: asString(row.payment_symbol),
     paymentAmount: asNumber(row.payment_amount),
+    previousSaleAmount: asNumber(row.previous_sale_amount),
+    previousSaleSymbol: asString(row.previous_sale_symbol),
+    previousSaleTxSignature: asString(row.previous_sale_tx_signature),
+    priceChangeAmount: asNumber(row.price_change_amount),
+    priceChangePercent: asNumber(row.price_change_percent),
+    priceChangeDirection: asString(row.price_change_direction),
     marketplace: asString(row.marketplace),
     txSignature: asString(row.tx_signature),
     buyer: asString(row.buyer),

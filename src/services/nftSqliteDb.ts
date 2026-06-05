@@ -131,9 +131,18 @@ function runNftMigrations(database: DatabaseSync) {
   addColumnIfMissing(database, "rwa_nft_events", "payment_mint", "TEXT");
   addColumnIfMissing(database, "rwa_nft_events", "payment_symbol", "TEXT");
   addColumnIfMissing(database, "rwa_nft_events", "payment_amount", "REAL");
+  addColumnIfMissing(database, "rwa_nft_events", "previous_sale_event_id", "TEXT");
+  addColumnIfMissing(database, "rwa_nft_events", "previous_sale_tx_signature", "TEXT");
+  addColumnIfMissing(database, "rwa_nft_events", "previous_sale_amount", "REAL");
+  addColumnIfMissing(database, "rwa_nft_events", "previous_sale_symbol", "TEXT");
+  addColumnIfMissing(database, "rwa_nft_events", "price_change_amount", "REAL");
+  addColumnIfMissing(database, "rwa_nft_events", "price_change_percent", "REAL");
+  addColumnIfMissing(database, "rwa_nft_events", "price_change_direction", "TEXT");
+  addColumnIfMissing(database, "rwa_nft_events", "price_change_calculated_at", "TEXT");
   database.exec(`
     CREATE INDEX IF NOT EXISTS idx_rwa_nft_events_payment_symbol ON rwa_nft_events(payment_symbol);
     CREATE INDEX IF NOT EXISTS idx_rwa_nft_events_payment_mint ON rwa_nft_events(payment_mint);
+    CREATE INDEX IF NOT EXISTS idx_rwa_nft_events_price_change_direction ON rwa_nft_events(price_change_direction);
   `);
 }
 

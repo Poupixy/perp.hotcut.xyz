@@ -100,6 +100,12 @@ async function main() {
       events.payment_mint,
       events.payment_symbol,
       events.payment_amount,
+      events.previous_sale_amount,
+      events.previous_sale_symbol,
+      events.previous_sale_tx_signature,
+      events.price_change_amount,
+      events.price_change_percent,
+      events.price_change_direction,
       events.marketplace,
       events.tx_signature,
       events.buyer,
@@ -184,6 +190,60 @@ async function main() {
       JOIN nft_assets assets ON assets.mint = events.mint
       WHERE ${visibleWhere} AND events.payment_amount IS NULL
     `, ...allowedParams),
+    salesWithCalculatedGrowth: scalar(`
+      SELECT COUNT(*) AS count
+      FROM rwa_nft_events events
+      JOIN nft_assets assets ON assets.mint = events.mint
+      WHERE ${visibleWhere} AND events.price_change_direction IN ('up', 'down', 'flat')
+    `, ...allowedParams),
+    salesWithoutPreviousSale: scalar(`
+      SELECT COUNT(*) AS count
+      FROM rwa_nft_events events
+      JOIN nft_assets assets ON assets.mint = events.mint
+      WHERE ${visibleWhere}
+        AND (events.price_change_direction IS NULL OR events.price_change_direction = 'unknown')
+    `, ...allowedParams),
+    salesWithGrowthUp: scalar(`
+      SELECT COUNT(*) AS count
+      FROM rwa_nft_events events
+      JOIN nft_assets assets ON assets.mint = events.mint
+      WHERE ${visibleWhere} AND events.price_change_direction = 'up'
+    `, ...allowedParams),
+    salesWithGrowthDown: scalar(`
+      SELECT COUNT(*) AS count
+      FROM rwa_nft_events events
+      JOIN nft_assets assets ON assets.mint = events.mint
+      WHERE ${visibleWhere} AND events.price_change_direction = 'down'
+    `, ...allowedParams),
+    salesWithGrowthFlat: scalar(`
+      SELECT COUNT(*) AS count
+      FROM rwa_nft_events events
+      JOIN nft_assets assets ON assets.mint = events.mint
+      WHERE ${visibleWhere} AND events.price_change_direction = 'flat'
+    `, ...allowedParams),
+    salesSkippedDueToPaymentSymbolMismatch: scalar(`
+      SELECT COUNT(*) AS count
+      FROM rwa_nft_events events
+      JOIN nft_assets assets ON assets.mint = events.mint
+      WHERE ${visibleWhere}
+        AND events.payment_symbol IS NOT NULL
+        AND EXISTS (
+          SELECT 1 FROM rwa_nft_events previous
+          WHERE previous.event_type = 'SALE'
+            AND previous.mint = events.mint
+            AND previous.event_at < events.event_at
+            AND previous.payment_symbol IS NOT NULL
+            AND previous.payment_symbol != events.payment_symbol
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM rwa_nft_events previous_same_symbol
+          WHERE previous_same_symbol.event_type = 'SALE'
+            AND previous_same_symbol.mint = events.mint
+            AND previous_same_symbol.event_at < events.event_at
+            AND previous_same_symbol.payment_symbol = events.payment_symbol
+            AND previous_same_symbol.payment_amount IS NOT NULL
+        )
+    `, ...allowedParams),
     salesMissingBuyer: scalar(`SELECT COUNT(*) AS count FROM rwa_nft_events WHERE event_type = 'SALE' AND tx_signature IS NOT NULL AND buyer IS NULL`),
     salesMissingSeller: scalar(`SELECT COUNT(*) AS count FROM rwa_nft_events WHERE event_type = 'SALE' AND tx_signature IS NOT NULL AND seller IS NULL`),
     salesMissingUsdConversion: scalar(`SELECT COUNT(*) AS count FROM rwa_nft_events WHERE event_type = 'SALE' AND tx_signature IS NOT NULL AND price_usd IS NULL`),
@@ -220,6 +280,11 @@ async function main() {
       payment: row.payment_amount !== null && row.payment_amount !== undefined && row.payment_symbol
         ? `${row.payment_amount} ${row.payment_symbol}`
         : null,
+      previousSale: row.previous_sale_amount !== null && row.previous_sale_amount !== undefined && row.previous_sale_symbol
+        ? `${row.previous_sale_amount} ${row.previous_sale_symbol}`
+        : null,
+      priceChangePercent: row.price_change_percent,
+      direction: row.price_change_direction ?? "unknown",
       source: row.source,
       marketplace: row.marketplace,
       fallbackVerified: fallbackVerified(row),

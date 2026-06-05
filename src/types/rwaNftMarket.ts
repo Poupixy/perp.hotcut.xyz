@@ -55,6 +55,12 @@ export type VerifiedSale = {
   paymentMint: string | null;
   paymentSymbol: string | null;
   paymentAmount: number | null;
+  previousSaleAmount: number | null;
+  previousSaleSymbol: string | null;
+  previousSaleTxSignature: string | null;
+  priceChangeAmount: number | null;
+  priceChangePercent: number | null;
+  priceChangeDirection: "up" | "down" | "flat" | "unknown" | null;
   marketplace: string | null;
   txSignature: string;
   buyer: string | null;

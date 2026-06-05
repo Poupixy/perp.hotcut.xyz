@@ -10,6 +10,12 @@ type VerifiedSale = {
   paymentMint: string | null;
   paymentSymbol: string | null;
   paymentAmount: number | null;
+  previousSaleAmount: number | null;
+  previousSaleSymbol: string | null;
+  previousSaleTxSignature: string | null;
+  priceChangeAmount: number | null;
+  priceChangePercent: number | null;
+  priceChangeDirection: "up" | "down" | "flat" | "unknown" | null;
   marketplace: string | null;
   txSignature: string;
   buyer: string | null;
@@ -98,6 +104,25 @@ function secondaryPrice(sale: VerifiedSale) {
   if (typeof sale.priceUsd === "number" && typeof sale.priceSol === "number") return fmtSol(sale.priceSol);
   if (typeof sale.priceSol === "number" && sale.priceUsd === null) return "No USD conversion";
   return "";
+}
+
+function priceGrowth(sale: VerifiedSale) {
+  const sameSymbol = sale.paymentSymbol && sale.previousSaleSymbol && sale.paymentSymbol === sale.previousSaleSymbol;
+  if (!sameSymbol || sale.priceChangeDirection === "unknown" || typeof sale.priceChangePercent !== "number") {
+    return { label: "No previous sale", amount: "", className: "text-muted-foreground" };
+  }
+
+  const sign = sale.priceChangeDirection === "up" ? "+" : sale.priceChangeDirection === "down" ? "-" : "";
+  const percent = `${sign}${Math.abs(sale.priceChangePercent).toLocaleString("en-US", { maximumFractionDigits: 1 })}%`;
+  const amount = typeof sale.priceChangeAmount === "number" && sale.paymentSymbol
+    ? `${sign}${Math.abs(sale.priceChangeAmount).toLocaleString("en-US", { maximumFractionDigits: 6 })} ${sale.paymentSymbol}`
+    : "";
+  const className = sale.priceChangeDirection === "up"
+    ? "text-emerald-400"
+    : sale.priceChangeDirection === "down"
+      ? "text-red-400"
+      : "text-muted-foreground";
+  return { label: percent, amount, className };
 }
 
 export function VerifiedSalesPage() {
@@ -191,6 +216,8 @@ export function VerifiedSalesPage() {
             <option value="price_sol_low">SOL low to high</option>
             <option value="price_usd_high">USD high to low</option>
             <option value="price_usd_low">USD low to high</option>
+            <option value="growth_high">Growth high to low</option>
+            <option value="growth_low">Growth low to high</option>
           </select>
         </div>
         <div className="grid md:grid-cols-6 gap-3">
@@ -224,6 +251,7 @@ export function VerifiedSalesPage() {
               <th className="text-left font-medium px-5 py-3">Category</th>
               <th className="text-right font-medium px-5 py-3">Price</th>
               <th className="text-right font-medium px-5 py-3">Conversion</th>
+              <th className="text-right font-medium px-5 py-3">Growth</th>
               <th className="text-left font-medium px-5 py-3">Marketplace</th>
               <th className="text-left font-medium px-5 py-3">Tx</th>
               <th className="text-left font-medium px-5 py-3">Buyer / Seller</th>
@@ -232,39 +260,46 @@ export function VerifiedSalesPage() {
           </thead>
           <tbody className="divide-y divide-border">
             {loading ? (
-              <tr><td colSpan={8} className="px-5 py-8 text-sm text-muted-foreground">Loading verified sales...</td></tr>
+              <tr><td colSpan={9} className="px-5 py-8 text-sm text-muted-foreground">Loading verified sales...</td></tr>
             ) : sales.length === 0 ? (
-              <tr><td colSpan={8} className="px-5 py-8 text-sm text-muted-foreground">No confirmed sale events yet. A sale appears here only after a tracked NFT receives a verified SALE event with a transaction signature.</td></tr>
-            ) : sales.map((sale) => (
-              <tr key={sale.id} className="hover:bg-surface-raised/40 transition">
-                <td className="px-5 py-3 min-w-[260px]">
-                  <div className="flex items-center gap-3">
-                    {sale.image ? <img src={sale.image} alt="" className="h-10 w-10 rounded-md object-cover bg-muted" /> : <div className="h-10 w-10 rounded-md bg-muted" />}
-                    <div className="min-w-0">
-                      <div className="font-medium truncate">{sale.name ?? "Unnamed NFT"}</div>
-                      <div className="text-[11px] text-muted-foreground font-mono truncate">{short(sale.mint)} · {sale.collection ?? "collection unknown"}</div>
+              <tr><td colSpan={9} className="px-5 py-8 text-sm text-muted-foreground">No confirmed sale events yet. A sale appears here only after a tracked NFT receives a verified SALE event with a transaction signature.</td></tr>
+            ) : sales.map((sale) => {
+              const growth = priceGrowth(sale);
+              return (
+                <tr key={sale.id} className="hover:bg-surface-raised/40 transition">
+                  <td className="px-5 py-3 min-w-[260px]">
+                    <div className="flex items-center gap-3">
+                      {sale.image ? <img src={sale.image} alt="" className="h-10 w-10 rounded-md object-cover bg-muted" /> : <div className="h-10 w-10 rounded-md bg-muted" />}
+                      <div className="min-w-0">
+                        <div className="font-medium truncate">{sale.name ?? "Unnamed NFT"}</div>
+                        <div className="text-[11px] text-muted-foreground font-mono truncate">{short(sale.mint)} · {sale.collection ?? "collection unknown"}</div>
+                      </div>
                     </div>
-                  </div>
-                </td>
-                <td className="px-5 py-3 text-muted-foreground">{categoryLabel(sale.category)}</td>
-                <td className="px-5 py-3 text-right font-mono font-semibold tabular-nums">{primaryPrice(sale)}</td>
-                <td className="px-5 py-3 text-right font-mono tabular-nums text-muted-foreground">{secondaryPrice(sale)}</td>
-                <td className="px-5 py-3">
-                  <div>{isManualSale(sale) ? "Manual verified" : sale.marketplace ?? "marketplace unknown"}</div>
-                  <div className="mt-1 flex flex-wrap gap-1.5 text-[11px] text-muted-foreground">
-                    <span className="rounded border border-border bg-surface px-1.5 py-0.5">{sourceLabel(sale.source)}</span>
-                    {sale.fallbackVerified && <span className="rounded border border-blue-400/30 bg-blue-400/10 px-1.5 py-0.5 text-blue-300">Fallback verified</span>}
-                    {isTestSale(sale) && <span className="rounded border border-primary/30 bg-primary/10 px-1.5 py-0.5 text-primary">Test sale</span>}
-                  </div>
-                </td>
-                <td className="px-5 py-3 font-mono text-xs text-muted-foreground">{short(sale.txSignature)}</td>
-                <td className="px-5 py-3 text-xs text-muted-foreground">
-                  <div>Buyer: <span className="font-mono">{sale.buyer ? short(sale.buyer) : "unknown"}</span></div>
-                  <div>Seller: <span className="font-mono">{sale.seller ? short(sale.seller) : "unknown"}</span></div>
-                </td>
-                <td className="px-5 py-3 text-right text-xs text-muted-foreground"><RelativeTime iso={sale.eventAt} /></td>
-              </tr>
-            ))}
+                  </td>
+                  <td className="px-5 py-3 text-muted-foreground">{categoryLabel(sale.category)}</td>
+                  <td className="px-5 py-3 text-right font-mono font-semibold tabular-nums">{primaryPrice(sale)}</td>
+                  <td className="px-5 py-3 text-right font-mono tabular-nums text-muted-foreground">{secondaryPrice(sale)}</td>
+                  <td className={`px-5 py-3 text-right font-mono tabular-nums ${growth.className}`}>
+                    <div className="font-semibold">{growth.label}</div>
+                    {growth.amount && <div className="text-[11px] opacity-80">{growth.amount}</div>}
+                  </td>
+                  <td className="px-5 py-3">
+                    <div>{isManualSale(sale) ? "Manual verified" : sale.marketplace ?? "marketplace unknown"}</div>
+                    <div className="mt-1 flex flex-wrap gap-1.5 text-[11px] text-muted-foreground">
+                      <span className="rounded border border-border bg-surface px-1.5 py-0.5">{sourceLabel(sale.source)}</span>
+                      {sale.fallbackVerified && <span className="rounded border border-blue-400/30 bg-blue-400/10 px-1.5 py-0.5 text-blue-300">Fallback verified</span>}
+                      {isTestSale(sale) && <span className="rounded border border-primary/30 bg-primary/10 px-1.5 py-0.5 text-primary">Test sale</span>}
+                    </div>
+                  </td>
+                  <td className="px-5 py-3 font-mono text-xs text-muted-foreground">{short(sale.txSignature)}</td>
+                  <td className="px-5 py-3 text-xs text-muted-foreground">
+                    <div>Buyer: <span className="font-mono">{sale.buyer ? short(sale.buyer) : "unknown"}</span></div>
+                    <div>Seller: <span className="font-mono">{sale.seller ? short(sale.seller) : "unknown"}</span></div>
+                  </td>
+                  <td className="px-5 py-3 text-right text-xs text-muted-foreground"><RelativeTime iso={sale.eventAt} /></td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

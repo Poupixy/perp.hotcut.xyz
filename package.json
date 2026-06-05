@@ -25,6 +25,7 @@
     "test:one-nft-flow": "tsx scripts/test-one-real-nft-flow.ts",
     "enrich:sale-from-tx": "tsx scripts/enrich-sale-from-tx.ts",
     "enrich:payment-tokens": "tsx scripts/enrich-payment-tokens.ts",
+    "calculate:price-growth": "tsx scripts/calculate-price-growth.ts",
     "backfill:verified-sales": "tsx scripts/backfill-verified-sales.ts"
   },
   "dependencies": {
