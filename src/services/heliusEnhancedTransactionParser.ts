@@ -116,6 +116,7 @@ function nftMintFromTx(tx: Record<string, unknown>, fallbackMint?: string | null
   const nftEvent = asRecord(tx.nft);
   const events = asRecord(tx.events);
   const nft = asRecord(events.nft);
+  const eventNfts = recordArray(nft.nfts);
   const nfts = Array.isArray(tx.nfts) ? tx.nfts.map(asRecord) : [];
   const transfers = Array.isArray(tx.tokenTransfers) ? tx.tokenTransfers.map(asRecord) : [];
   return firstString(
@@ -126,9 +127,11 @@ function nftMintFromTx(tx: Record<string, unknown>, fallbackMint?: string | null
     nftEvent.assetMint,
     nft.mint,
     nft.assetMint,
+    eventNfts.find((row) => isNftTransfer(row))?.mint,
+    eventNfts[0]?.mint,
     nfts[0]?.mint,
     nfts[0]?.assetMint,
-    transfers.find((transfer) => asString(transfer.mint))?.mint,
+    transfers.find((transfer) => isNftTransfer(transfer))?.mint,
     fallbackMint,
   );
 }
