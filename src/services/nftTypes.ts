@@ -65,6 +65,15 @@ export type NftQueueState = {
   lastHeliusCallAt: string | null;
   backoffUntil: string | null;
   updatedAt: string | null;
+  ingestionRunning?: boolean;
+  ingestionCurrentCollection?: string | null;
+  ingestionCurrentPage?: number | null;
+  ingestionInserted?: number;
+  ingestionUpdated?: number;
+  ingestionDuplicatesSkipped?: number;
+  ingestionLastError?: string | null;
+  latestIngestionReportPath?: string | null;
+  latestUniverseComparisonReportPath?: string | null;
 };
 
 export type NftIngestionDb = {

@@ -80,6 +80,15 @@ function rowToQueue(row: Record<string, unknown> | undefined): NftQueueState {
     lastHeliusCallAt: asString(row.last_helius_call_at),
     backoffUntil: asString(row.backoff_until),
     updatedAt: asString(row.updated_at),
+    ingestionRunning: fromSqliteBool(row.ingestion_running),
+    ingestionCurrentCollection: asString(row.ingestion_current_collection),
+    ingestionCurrentPage: asNumber(row.ingestion_current_page),
+    ingestionInserted: asNumber(row.ingestion_inserted) ?? 0,
+    ingestionUpdated: asNumber(row.ingestion_updated) ?? 0,
+    ingestionDuplicatesSkipped: asNumber(row.ingestion_duplicates_skipped) ?? 0,
+    ingestionLastError: asString(row.ingestion_last_error),
+    latestIngestionReportPath: asString(row.latest_ingestion_report_path),
+    latestUniverseComparisonReportPath: asString(row.latest_universe_comparison_report_path),
   };
 }
 

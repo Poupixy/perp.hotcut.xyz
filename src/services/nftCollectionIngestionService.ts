@@ -1,0 +1,694 @@
+import { mkdirSync, writeFileSync, existsSync, statSync, readdirSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { ALLOWED_RWA_NFT_CATEGORIES, detectRwaNftCategory, isAllowedRwaNftCategory } from "./nftCategoryService";
+import { getNftDb, nftDatabasePath, shouldStoreRawHeliusJson, sqliteBool, stringifyJson } from "./nftSqliteDb";
+import { getTrackedMarketCategory, trackedMarketLabel } from "./trackedMarketCategories";
+import { getAllowedNftCollections, type TargetNftCollectionConfig } from "./trackedNftsConfig";
+
+const HELIUS_RPC_URL = "https://mainnet.helius-rpc.com/";
+const DEFAULT_PAGE_LIMIT = 1000;
+const REPORT_DIR = "ingestion-reports";
+
+type RuntimeEnv = Record<string, string | undefined>;
+
+export type IngestAllowedCollectionsOptions = {
+  dryRun?: boolean;
+  limitPages?: number | null;
+  limitAssets?: number | null;
+  collection?: string | null;
+  delayMs?: number;
+  resume?: boolean;
+  includeStaging?: boolean;
+  storeRaw?: boolean;
+  compareUniverse?: boolean;
+};
+
+type HeliusPage = {
+  items: unknown[];
+  total: number | null;
+};
+
+type AssetCandidate = {
+  mint: string;
+  name: string | null;
+  description: string | null;
+  image: string | null;
+  owner: string | null;
+  collection: string | null;
+  category: string;
+  categorySource: "attribute_filter" | "metadata" | "fallback_collection" | "unknown";
+  market: string;
+  attributes: unknown[];
+  tokenStandard: string | null;
+  interface: string | null;
+  sourceCollection: string;
+  sourceCollectionLabel: string;
+  isStaging: boolean;
+  previousFilterMatched: boolean;
+  raw: unknown;
+};
+
+type CollectionReport = {
+  key: string;
+  label: string;
+  market: string;
+  collectionAddress: string;
+  stagingCollection: boolean;
+  skippedCollection: boolean;
+  pagesScanned: number;
+  heliusReportedTotal: number | null;
+  assetsSeen: number;
+  previousFilterMatchedAssets: number;
+  allowedCategoryAssets: number;
+  unknownCategoryAssets: number;
+  stagingAssets: number;
+  visibleAfterPublicFilters: number;
+  duplicatesWithinRunSkipped: number;
+  duplicatesAlreadyExisting: number;
+  wouldInsert: number;
+  wouldUpdate: number;
+  inserted: number;
+  updated: number;
+  categoryCounts: Record<string, number>;
+  excluded: Record<string, number>;
+  errors: string[];
+};
+
+export type NftUniverseIngestionReport = {
+  dryRun: boolean;
+  compareUniverse: boolean;
+  startedAt: string;
+  finishedAt: string;
+  options: Required<Omit<IngestAllowedCollectionsOptions, "collection" | "limitAssets" | "limitPages">> & {
+    collection: string | null;
+    limitAssets: number | null;
+    limitPages: number | null;
+  };
+  allowlistedCollections: Array<TargetNftCollectionConfig & { key: string; stagingCollection: boolean }>;
+  collections: CollectionReport[];
+  totals: {
+    collectionsProcessed: number;
+    pagesProcessed: number;
+    heliusAssetsSeen: number;
+    previousFilterMatchedAssets: number;
+    allowedCategoryAssets: number;
+    unknownCategoryAssets: number;
+    stagingAssets: number;
+    visibleAfterPublicFilters: number;
+    duplicatesWithinRunSkipped: number;
+    duplicatesAlreadyExisting: number;
+    wouldInsert: number;
+    wouldUpdate: number;
+    inserted: number;
+    updated: number;
+    categoryCounts: Record<string, number>;
+    sourceCollectionCounts: Record<string, number>;
+    missingImageCount: number;
+    missingNameCount: number;
+    missingOwnerCount: number;
+    excluded: Record<string, number>;
+    errors: number;
+  };
+  comparison: {
+    previousFilterMatchedAssets: number;
+    visibleAfterPublicFilters: number;
+    difference: number;
+    matchesPreviousFilterInScannedPages: boolean;
+    note: string;
+  };
+  reportPath: string;
+};
+
+function env(): RuntimeEnv {
+  return (globalThis as unknown as { process?: { env?: RuntimeEnv } }).process?.env ?? {};
+}
+
+function nowIso() {
+  return new Date().toISOString();
+}
+
+function slug(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "unknown";
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+function asString(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value : null;
+}
+
+function asNumber(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function attributesFromMetadata(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
+}
+
+function isStagingText(...values: unknown[]) {
+  return values.some((value) => String(value ?? "").toLowerCase().includes("staging"));
+}
+
+function addCount(target: Record<string, number>, key: string, amount = 1) {
+  target[key] = (target[key] ?? 0) + amount;
+}
+
+function reportDirectory() {
+  return join(dirname(nftDatabasePath()), REPORT_DIR);
+}
+
+function reportPath(prefix: string) {
+  const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\..+$/, "").replace("T", "-");
+  return join(reportDirectory(), `${prefix}-${stamp}.json`);
+}
+
+function latestReportPath(prefix: string) {
+  const directory = reportDirectory();
+  if (!existsSync(directory)) return null;
+  const files = readdirSync(directory)
+    .filter((file) => file.startsWith(prefix) && file.endsWith(".json"))
+    .map((file) => join(directory, file))
+    .sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs);
+  return files[0] ?? null;
+}
+
+function normalizeCollectionKey(collection: TargetNftCollectionConfig) {
+  return `${slug(collection.label)}-${collection.collectionAddress.slice(0, 8)}`;
+}
+
+function normalizeAsset(raw: unknown, collection: TargetNftCollectionConfig): AssetCandidate | null {
+  const record = asRecord(raw);
+  const content = asRecord(record.content);
+  const metadata = asRecord(content.metadata);
+  const links = asRecord(content.links);
+  const ownership = asRecord(record.ownership);
+  const tokenInfo = asRecord(record.token_info);
+  const grouping = Array.isArray(record.grouping) ? record.grouping.map(asRecord) : [];
+  const collectionGroup = grouping.find((group) => group.group_key === "collection");
+  const mint = asString(record.id);
+  if (!mint) return null;
+
+  const attributes = attributesFromMetadata(metadata.attributes);
+  const attributeCategory = getTrackedMarketCategory(attributes);
+  const metadataCategory = detectRwaNftCategory({
+    name: asString(metadata.name),
+    description: asString(metadata.description),
+    collection: asString(collectionGroup?.group_value) ?? collection.collectionAddress,
+    attributes,
+  });
+  const category = attributeCategory?.market ?? (metadataCategory !== "unknown" ? metadataCategory : "unknown");
+  const categorySource = attributeCategory
+    ? "attribute_filter"
+    : metadataCategory !== "unknown"
+      ? "metadata"
+      : "unknown";
+  const sourceCollection = asString(collectionGroup?.group_value) ?? collection.collectionAddress;
+
+  return {
+    mint,
+    name: asString(metadata.name),
+    description: asString(metadata.description),
+    image: asString(links.image),
+    owner: asString(ownership.owner),
+    collection: sourceCollection,
+    category: isAllowedRwaNftCategory(category) ? category : "unknown",
+    categorySource,
+    market: isAllowedRwaNftCategory(category) ? category : collection.market,
+    attributes,
+    tokenStandard: asString(tokenInfo.token_program) ?? asString(record.interface),
+    interface: asString(record.interface),
+    sourceCollection: collection.collectionAddress,
+    sourceCollectionLabel: collection.label,
+    isStaging: isStagingText(metadata.name, sourceCollection, collection.label),
+    previousFilterMatched: Boolean(attributeCategory),
+    raw,
+  };
+}
+
+async function heliusAssetsPage(collectionAddress: string, page: number, limit: number): Promise<HeliusPage> {
+  const apiKey = env().HELIUS_API_KEY;
+  if (!apiKey) throw new Error("Missing HELIUS_API_KEY");
+
+  const response = await fetch(`${HELIUS_RPC_URL}?api-key=${apiKey}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: "ingest-allowed-collections",
+      method: "getAssetsByGroup",
+      params: {
+        groupKey: "collection",
+        groupValue: collectionAddress,
+        page,
+        limit,
+      },
+    }),
+  });
+
+  if (response.status === 429) throw new Error("Helius rate limit hit");
+  if (!response.ok) throw new Error(`Helius request failed: ${response.status} ${response.statusText}`);
+  const payload = await response.json() as { result?: { items?: unknown[]; total?: number }; error?: { message?: string } };
+  if (payload.error) throw new Error(payload.error.message ?? "Helius returned an error");
+  return {
+    items: Array.isArray(payload.result?.items) ? payload.result.items : [],
+    total: typeof payload.result?.total === "number" ? payload.result.total : null,
+  };
+}
+
+function loadExistingAssets() {
+  const rows = getNftDb().prepare("SELECT mint, updated_at FROM nft_assets").all() as Array<{ mint: string; updated_at: string | null }>;
+  return new Map(rows.map((row) => [row.mint, row]));
+}
+
+function upsertNftAsset(candidate: AssetCandidate, options: { storeRaw: boolean }) {
+  const timestamp = nowIso();
+  getNftDb().prepare(`
+    INSERT INTO nft_assets (
+      id, mint, market, name, description, image, owner, collection, category, attributes_json,
+      token_standard, interface, source_collection, is_staging, raw_helius_json, is_listed,
+      listed_price_sol, listed_price_usd, listing_marketplace, listing_updated_at,
+      last_sale_price_sol, last_sale_price_usd, last_sale_at, last_sale_marketplace, last_sale_tx_signature,
+      floor_price_sol, market_updated_at, updated_at, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, ?, ?)
+    ON CONFLICT(mint) DO UPDATE SET
+      market = excluded.market,
+      name = excluded.name,
+      description = excluded.description,
+      image = excluded.image,
+      owner = excluded.owner,
+      collection = excluded.collection,
+      category = excluded.category,
+      attributes_json = excluded.attributes_json,
+      token_standard = excluded.token_standard,
+      interface = excluded.interface,
+      source_collection = excluded.source_collection,
+      is_staging = excluded.is_staging,
+      raw_helius_json = excluded.raw_helius_json,
+      updated_at = excluded.updated_at
+  `).run(
+    slug(candidate.mint),
+    candidate.mint,
+    candidate.market,
+    candidate.name,
+    candidate.description,
+    candidate.image,
+    candidate.owner,
+    candidate.collection,
+    candidate.category,
+    stringifyJson(candidate.attributes),
+    candidate.tokenStandard,
+    candidate.interface,
+    candidate.sourceCollection,
+    sqliteBool(candidate.isStaging),
+    options.storeRaw || shouldStoreRawHeliusJson() ? stringifyJson(candidate.raw) : null,
+    timestamp,
+    timestamp,
+  );
+}
+
+function updateIngestionState(input: {
+  running: boolean;
+  currentCollection?: string | null;
+  currentPage?: number | null;
+  inserted?: number;
+  updated?: number;
+  duplicatesSkipped?: number;
+  lastError?: string | null;
+  ingestionReportPath?: string | null;
+  universeReportPath?: string | null;
+}) {
+  getNftDb().prepare(`
+    UPDATE queue_state SET
+      ingestion_running = ?,
+      ingestion_current_collection = ?,
+      ingestion_current_page = ?,
+      ingestion_inserted = ?,
+      ingestion_updated = ?,
+      ingestion_duplicates_skipped = ?,
+      ingestion_last_error = ?,
+      latest_ingestion_report_path = COALESCE(?, latest_ingestion_report_path),
+      latest_universe_comparison_report_path = COALESCE(?, latest_universe_comparison_report_path),
+      updated_at = ?
+    WHERE id = 'default'
+  `).run(
+    sqliteBool(input.running),
+    input.currentCollection ?? null,
+    input.currentPage ?? null,
+    input.inserted ?? 0,
+    input.updated ?? 0,
+    input.duplicatesSkipped ?? 0,
+    input.lastError ?? null,
+    input.ingestionReportPath ?? null,
+    input.universeReportPath ?? null,
+    nowIso(),
+  );
+}
+
+function initCollectionReport(collection: TargetNftCollectionConfig): CollectionReport {
+  return {
+    key: normalizeCollectionKey(collection),
+    label: collection.label,
+    market: collection.market,
+    collectionAddress: collection.collectionAddress,
+    stagingCollection: isStagingText(collection.label, collection.collectionAddress),
+    skippedCollection: false,
+    pagesScanned: 0,
+    heliusReportedTotal: null,
+    assetsSeen: 0,
+    previousFilterMatchedAssets: 0,
+    allowedCategoryAssets: 0,
+    unknownCategoryAssets: 0,
+    stagingAssets: 0,
+    visibleAfterPublicFilters: 0,
+    duplicatesWithinRunSkipped: 0,
+    duplicatesAlreadyExisting: 0,
+    wouldInsert: 0,
+    wouldUpdate: 0,
+    inserted: 0,
+    updated: 0,
+    categoryCounts: {},
+    excluded: {},
+    errors: [],
+  };
+}
+
+function buildTotals(collections: CollectionReport[]) {
+  const totals: NftUniverseIngestionReport["totals"] = {
+    collectionsProcessed: collections.filter((item) => !item.skippedCollection).length,
+    pagesProcessed: 0,
+    heliusAssetsSeen: 0,
+    previousFilterMatchedAssets: 0,
+    allowedCategoryAssets: 0,
+    unknownCategoryAssets: 0,
+    stagingAssets: 0,
+    visibleAfterPublicFilters: 0,
+    duplicatesWithinRunSkipped: 0,
+    duplicatesAlreadyExisting: 0,
+    wouldInsert: 0,
+    wouldUpdate: 0,
+    inserted: 0,
+    updated: 0,
+    categoryCounts: {},
+    sourceCollectionCounts: {},
+    missingImageCount: 0,
+    missingNameCount: 0,
+    missingOwnerCount: 0,
+    excluded: {},
+    errors: 0,
+  };
+
+  for (const collection of collections) {
+    totals.pagesProcessed += collection.pagesScanned;
+    totals.heliusAssetsSeen += collection.assetsSeen;
+    totals.previousFilterMatchedAssets += collection.previousFilterMatchedAssets;
+    totals.allowedCategoryAssets += collection.allowedCategoryAssets;
+    totals.unknownCategoryAssets += collection.unknownCategoryAssets;
+    totals.stagingAssets += collection.stagingAssets;
+    totals.visibleAfterPublicFilters += collection.visibleAfterPublicFilters;
+    totals.duplicatesWithinRunSkipped += collection.duplicatesWithinRunSkipped;
+    totals.duplicatesAlreadyExisting += collection.duplicatesAlreadyExisting;
+    totals.wouldInsert += collection.wouldInsert;
+    totals.wouldUpdate += collection.wouldUpdate;
+    totals.inserted += collection.inserted;
+    totals.updated += collection.updated;
+    totals.errors += collection.errors.length;
+    for (const [key, value] of Object.entries(collection.categoryCounts)) addCount(totals.categoryCounts, key, value);
+    for (const [key, value] of Object.entries(collection.excluded)) addCount(totals.excluded, key, value);
+    addCount(totals.sourceCollectionCounts, collection.collectionAddress, collection.assetsSeen);
+  }
+  return totals;
+}
+
+function writeReport(report: Omit<NftUniverseIngestionReport, "reportPath">, prefix: string) {
+  mkdirSync(reportDirectory(), { recursive: true });
+  const path = reportPath(prefix);
+  const fullReport = { ...report, reportPath: path };
+  writeFileSync(path, JSON.stringify(fullReport, null, 2));
+  return fullReport;
+}
+
+export function getLatestNftIngestionReportPath() {
+  return latestReportPath("nft-ingestion-");
+}
+
+export function getLatestNftUniverseComparisonReportPath() {
+  return latestReportPath("nft-universe-dryrun-");
+}
+
+export async function ingestAllowedCollections(options: IngestAllowedCollectionsOptions = {}): Promise<NftUniverseIngestionReport> {
+  const dryRun = options.dryRun ?? true;
+  const delayMs = Math.max(Math.trunc(options.delayMs ?? 30_000), 0);
+  const pageLimit = DEFAULT_PAGE_LIMIT;
+  const limitPages = options.limitPages ?? null;
+  const limitAssets = options.limitAssets ?? null;
+  const includeStaging = options.includeStaging ?? false;
+  const storeRaw = options.storeRaw ?? false;
+  const compareUniverse = options.compareUniverse ?? true;
+  const resume = options.resume ?? true;
+  const startedAt = nowIso();
+  const existingAssets = loadExistingAssets();
+  const seenMints = new Set<string>();
+
+  const collections = getAllowedNftCollections().filter((collection) => {
+    if (!options.collection) return true;
+    return collection.collectionAddress === options.collection || normalizeCollectionKey(collection) === options.collection || collection.label === options.collection;
+  });
+
+  if (!dryRun) updateIngestionState({ running: true, inserted: 0, updated: 0, duplicatesSkipped: 0 });
+
+  const collectionReports: CollectionReport[] = [];
+  let totalProcessedAssets = 0;
+  let inserted = 0;
+  let updated = 0;
+  let duplicatesSkipped = 0;
+
+  try {
+    for (const collection of collections) {
+      const collectionReport = initCollectionReport(collection);
+      collectionReports.push(collectionReport);
+
+      if (collectionReport.stagingCollection && !includeStaging) {
+        collectionReport.skippedCollection = true;
+        addCount(collectionReport.excluded, "staging_collection");
+        continue;
+      }
+
+      let page = 1;
+      while (true) {
+        if (limitPages && collectionReport.pagesScanned >= limitPages) break;
+        if (limitAssets && totalProcessedAssets >= limitAssets) break;
+
+        if (!dryRun) updateIngestionState({
+          running: true,
+          currentCollection: collection.collectionAddress,
+          currentPage: page,
+          inserted,
+          updated,
+          duplicatesSkipped,
+        });
+        console.log(`[COLLECTION INGESTION] Fetching collection: ${collection.collectionAddress}`);
+        console.log(`[COLLECTION INGESTION] Page ${page}`);
+
+        let result: HeliusPage;
+        try {
+          result = await heliusAssetsPage(collection.collectionAddress, page, pageLimit);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "unknown error";
+          collectionReport.errors.push(message);
+          if (!dryRun) updateIngestionState({ running: true, lastError: message, inserted, updated, duplicatesSkipped });
+          break;
+        }
+
+        collectionReport.pagesScanned += 1;
+        collectionReport.heliusReportedTotal = result.total;
+        console.log(`[COLLECTION INGESTION] Assets found: ${result.items.length}`);
+
+        for (const raw of result.items) {
+          if (limitAssets && totalProcessedAssets >= limitAssets) break;
+          collectionReport.assetsSeen += 1;
+          totalProcessedAssets += 1;
+
+          const candidate = normalizeAsset(raw, collection);
+          if (!candidate) {
+            addCount(collectionReport.excluded, "missing_mint");
+            continue;
+          }
+
+          if (seenMints.has(candidate.mint)) {
+            collectionReport.duplicatesWithinRunSkipped += 1;
+            duplicatesSkipped += 1;
+            continue;
+          }
+          seenMints.add(candidate.mint);
+
+          if (candidate.previousFilterMatched) collectionReport.previousFilterMatchedAssets += 1;
+          if (candidate.category === "unknown") {
+            collectionReport.unknownCategoryAssets += 1;
+            addCount(collectionReport.excluded, "unknown_category");
+          }
+          if (candidate.isStaging) {
+            collectionReport.stagingAssets += 1;
+            addCount(collectionReport.excluded, "staging_asset");
+          }
+          if (!isAllowedRwaNftCategory(candidate.category)) {
+            addCount(collectionReport.excluded, "category_not_allowed");
+          } else {
+            collectionReport.allowedCategoryAssets += 1;
+          }
+          if (!candidate.image) addCount(collectionReport.excluded, "missing_image");
+          if (!candidate.name) addCount(collectionReport.excluded, "missing_name");
+          if (!candidate.owner) addCount(collectionReport.excluded, "missing_owner");
+          addCount(collectionReport.categoryCounts, candidate.category);
+
+          const publiclyVisible = isAllowedRwaNftCategory(candidate.category) && candidate.category !== "unknown" && !candidate.isStaging;
+          if (publiclyVisible) collectionReport.visibleAfterPublicFilters += 1;
+
+          const exists = existingAssets.has(candidate.mint);
+          if (exists) {
+            collectionReport.duplicatesAlreadyExisting += 1;
+            collectionReport.wouldUpdate += 1;
+          } else {
+            collectionReport.wouldInsert += 1;
+          }
+
+          if (!dryRun) {
+            upsertNftAsset(candidate, { storeRaw });
+            if (exists) {
+              collectionReport.updated += 1;
+              updated += 1;
+            } else {
+              collectionReport.inserted += 1;
+              inserted += 1;
+              existingAssets.set(candidate.mint, { mint: candidate.mint, updated_at: nowIso() });
+            }
+          }
+        }
+
+        if (result.items.length === 0) break;
+        if (typeof result.total === "number" && page * pageLimit >= result.total) break;
+        if (result.items.length < pageLimit) break;
+        if (limitAssets && totalProcessedAssets >= limitAssets) break;
+        page += 1;
+        if (delayMs > 0) await new Promise((resolve) => setTimeout(resolve, delayMs));
+      }
+    }
+  } finally {
+    if (!dryRun) updateIngestionState({
+      running: false,
+      currentCollection: null,
+      currentPage: null,
+      inserted,
+      updated,
+      duplicatesSkipped,
+    });
+  }
+
+  const totals = buildTotals(collectionReports);
+  for (const collection of collectionReports) {
+    totals.missingImageCount += collection.excluded.missing_image ?? 0;
+    totals.missingNameCount += collection.excluded.missing_name ?? 0;
+    totals.missingOwnerCount += collection.excluded.missing_owner ?? 0;
+  }
+
+  const reportWithoutPath = {
+    dryRun,
+    compareUniverse,
+    startedAt,
+    finishedAt: nowIso(),
+    options: {
+      dryRun,
+      delayMs,
+      resume,
+      includeStaging,
+      storeRaw,
+      compareUniverse,
+      collection: options.collection ?? null,
+      limitAssets,
+      limitPages,
+    },
+    allowlistedCollections: getAllowedNftCollections().map((collection) => ({
+      ...collection,
+      key: normalizeCollectionKey(collection),
+      stagingCollection: isStagingText(collection.label, collection.collectionAddress),
+    })),
+    collections: collectionReports,
+    totals,
+    comparison: {
+      previousFilterMatchedAssets: totals.previousFilterMatchedAssets,
+      visibleAfterPublicFilters: totals.visibleAfterPublicFilters,
+      difference: totals.visibleAfterPublicFilters - totals.previousFilterMatchedAssets,
+      matchesPreviousFilterInScannedPages: totals.visibleAfterPublicFilters === totals.previousFilterMatchedAssets,
+      note: compareUniverse
+        ? "previousFilterMatchedAssets reflects the older attribute-category NFT filter; visibleAfterPublicFilters reflects current public category/staging/unknown filters for scanned pages."
+        : "Universe comparison disabled.",
+    },
+  };
+
+  const prefix = dryRun && compareUniverse ? "nft-universe-dryrun" : "nft-ingestion";
+  const report = writeReport(reportWithoutPath, prefix);
+  if (!dryRun) updateIngestionState({
+    running: false,
+    inserted,
+    updated,
+    duplicatesSkipped,
+    ingestionReportPath: report.reportPath,
+    universeReportPath: dryRun && compareUniverse ? report.reportPath : null,
+  });
+  return report;
+}
+
+export function nftDbExtendedStats() {
+  const database = getNftDb();
+  const allowedPlaceholders = ALLOWED_RWA_NFT_CATEGORIES.map(() => "?").join(", ");
+  const allowedParams = [...ALLOWED_RWA_NFT_CATEGORIES];
+  const scalar = (sql: string, ...params: unknown[]) => {
+    const row = database.prepare(sql).get(...params) as { count?: number } | undefined;
+    return Number(row?.count ?? 0);
+  };
+  return {
+    nftAssetsTotal: scalar("SELECT COUNT(*) AS count FROM nft_assets"),
+    trackedNftsTotal: scalar("SELECT COUNT(*) AS count FROM tracked_nfts"),
+    categoryCounts: database.prepare("SELECT COALESCE(category, 'unknown') AS category, COUNT(*) AS count FROM nft_assets GROUP BY COALESCE(category, 'unknown') ORDER BY count DESC").all(),
+    unknownCount: scalar("SELECT COUNT(*) AS count FROM nft_assets WHERE category IS NULL OR category = 'unknown'"),
+    stagingCount: scalar("SELECT COUNT(*) AS count FROM nft_assets WHERE is_staging = 1"),
+    visiblePublicNftCount: scalar(`
+      SELECT COUNT(*) AS count FROM nft_assets
+      WHERE is_staging = 0
+        AND category IS NOT NULL
+        AND category != 'unknown'
+        AND category IN (${allowedPlaceholders})
+    `, ...allowedParams),
+    sourceCollectionCounts: database.prepare("SELECT COALESCE(source_collection, 'unknown') AS source_collection, COUNT(*) AS count FROM nft_assets GROUP BY COALESCE(source_collection, 'unknown') ORDER BY count DESC").all(),
+    missingImageCount: scalar("SELECT COUNT(*) AS count FROM nft_assets WHERE image IS NULL OR image = ''"),
+    missingNameCount: scalar("SELECT COUNT(*) AS count FROM nft_assets WHERE name IS NULL OR name = ''"),
+    missingOwnerCount: scalar("SELECT COUNT(*) AS count FROM nft_assets WHERE owner IS NULL OR owner = ''"),
+    duplicateMintCount: scalar("SELECT COUNT(*) AS count FROM (SELECT mint FROM nft_assets GROUP BY mint HAVING COUNT(*) > 1)"),
+    latestIngestionReportPath: getLatestNftIngestionReportPath(),
+    latestUniverseComparisonReportPath: getLatestNftUniverseComparisonReportPath(),
+  };
+}
+
+export function formatIngestionSummary(report: NftUniverseIngestionReport) {
+  return [
+    `dryRun: ${report.dryRun}`,
+    `report: ${report.reportPath}`,
+    `allowlisted collections: ${report.allowlistedCollections.length}`,
+    `collections processed: ${report.totals.collectionsProcessed}`,
+    `pages processed: ${report.totals.pagesProcessed}`,
+    `Helius assets seen: ${report.totals.heliusAssetsSeen}`,
+    `previous filter matched assets: ${report.totals.previousFilterMatchedAssets}`,
+    `visible after public filters: ${report.totals.visibleAfterPublicFilters}`,
+    `would insert: ${report.totals.wouldInsert}`,
+    `would update: ${report.totals.wouldUpdate}`,
+    `duplicates in run skipped: ${report.totals.duplicatesWithinRunSkipped}`,
+    `already existing assets: ${report.totals.duplicatesAlreadyExisting}`,
+    `unknown category: ${report.totals.unknownCategoryAssets}`,
+    `staging: ${report.totals.stagingAssets}`,
+    `category counts: ${JSON.stringify(report.totals.categoryCounts)}`,
+    `excluded: ${JSON.stringify(report.totals.excluded)}`,
+    `matches previous filter on scanned pages: ${report.comparison.matchesPreviousFilterInScannedPages}`,
+    `comparison difference: ${report.comparison.difference}`,
+  ].join("\n");
+}

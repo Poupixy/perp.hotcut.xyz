@@ -139,6 +139,15 @@ function runNftMigrations(database: DatabaseSync) {
   addColumnIfMissing(database, "rwa_nft_events", "price_change_percent", "REAL");
   addColumnIfMissing(database, "rwa_nft_events", "price_change_direction", "TEXT");
   addColumnIfMissing(database, "rwa_nft_events", "price_change_calculated_at", "TEXT");
+  addColumnIfMissing(database, "queue_state", "ingestion_running", "INTEGER NOT NULL DEFAULT 0");
+  addColumnIfMissing(database, "queue_state", "ingestion_current_collection", "TEXT");
+  addColumnIfMissing(database, "queue_state", "ingestion_current_page", "INTEGER");
+  addColumnIfMissing(database, "queue_state", "ingestion_inserted", "INTEGER NOT NULL DEFAULT 0");
+  addColumnIfMissing(database, "queue_state", "ingestion_updated", "INTEGER NOT NULL DEFAULT 0");
+  addColumnIfMissing(database, "queue_state", "ingestion_duplicates_skipped", "INTEGER NOT NULL DEFAULT 0");
+  addColumnIfMissing(database, "queue_state", "ingestion_last_error", "TEXT");
+  addColumnIfMissing(database, "queue_state", "latest_ingestion_report_path", "TEXT");
+  addColumnIfMissing(database, "queue_state", "latest_universe_comparison_report_path", "TEXT");
   database.exec(`
     CREATE INDEX IF NOT EXISTS idx_rwa_nft_events_payment_symbol ON rwa_nft_events(payment_symbol);
     CREATE INDEX IF NOT EXISTS idx_rwa_nft_events_payment_mint ON rwa_nft_events(payment_mint);
