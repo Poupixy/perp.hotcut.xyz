@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { RwaNftMarketEvent, RwaNftMarketEventSource, RwaNftMarketEventType, VerifiedSale } from "@/types/rwaNftMarket";
-import { isAllowedRwaNftCategory } from "./nftCategoryService";
+import { ALLOWED_RWA_NFT_CATEGORIES, isAllowedRwaNftCategory } from "./nftCategoryService";
 import { getNftDb, parseJson, sqliteBool, stringifyJson } from "./nftSqliteDb";
 
 export type MarketEventFilters = {
@@ -228,8 +228,9 @@ export async function getVerifiedSales(filters: MarketEventFilters = {}): Promis
     "events.tx_signature IS NOT NULL",
     "events.category IS NOT NULL",
     "events.category != 'unknown'",
+    `events.category IN (${ALLOWED_RWA_NFT_CATEGORIES.map(() => "?").join(", ")})`,
   ];
-  const params: unknown[] = [];
+  const params: unknown[] = [...ALLOWED_RWA_NFT_CATEGORIES];
 
   if (!filters.includeStaging) where.push("assets.is_staging = 0");
   if (filters.category && filters.category !== "all") {

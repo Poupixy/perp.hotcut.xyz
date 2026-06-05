@@ -19,7 +19,9 @@
     "migrate:nft-json": "tsx scripts/migrate-nft-json-to-db.ts",
     "validate:nft-db": "tsx scripts/validate-nft-db.ts",
     "validate:rwa-market": "tsx scripts/validate-rwa-market-tracking.ts",
-    "refresh:rwa-market": "tsx src/jobs/refreshRwaNftMarketData.ts"
+    "refresh:rwa-market": "tsx src/jobs/refreshRwaNftMarketData.ts",
+    "seed:verified-sale": "tsx scripts/seed-verified-sale.ts",
+    "check:verified-sales": "tsx scripts/check-verified-sales.ts"
   },
   "dependencies": {
     "@cloudflare/vite-plugin": "^1.25.5",
