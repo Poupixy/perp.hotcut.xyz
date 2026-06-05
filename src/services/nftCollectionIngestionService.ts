@@ -15,6 +15,7 @@ type RuntimeEnv = Record<string, string | undefined>;
 export type IngestAllowedCollectionsOptions = {
   dryRun?: boolean;
   countOnly?: boolean;
+  debugPagination?: boolean;
   limitPages?: number | null;
   limitAssets?: number | null;
   collection?: string | null;
@@ -28,6 +29,23 @@ export type IngestAllowedCollectionsOptions = {
 type HeliusPage = {
   items: unknown[];
   total: number | null;
+  page: number | null;
+  limit: number | null;
+};
+
+type PaginationDebugEntry = {
+  collection: string;
+  groupKey: "collection";
+  groupValue: string;
+  requestedPage: number;
+  requestedLimit: number;
+  resultPage: number | null;
+  resultLimit: number | null;
+  resultTotal: number | null;
+  itemsLength: number;
+  cumulativeCount: number;
+  totalGreaterThanItemsLength: boolean;
+  stopCondition: string | null;
 };
 
 type AssetCandidate = {
@@ -63,6 +81,13 @@ type CollectionReport = {
   skippedCollection: boolean;
   pagesScanned: number;
   heliusReportedTotal: number | null;
+  requestedGroupKey: "collection";
+  requestedLimit: number;
+  expectedPagesFromTotal: number | null;
+  totalCountedByScript: number;
+  stopReason: string | null;
+  paginationWarnings: string[];
+  paginationDebug: PaginationDebugEntry[];
   assetsSeen: number;
   previousFilterMatchedAssets: number;
   previousFilterMatchedCards: number;
@@ -106,6 +131,7 @@ export type NftUniverseIngestionReport = {
   };
   allowlistedCollections: Array<TargetNftCollectionConfig & { key: string; stagingCollection: boolean }>;
   collections: CollectionReport[];
+  paginationDebug: Record<string, PaginationDebugEntry[]>;
   totals: {
     collectionsProcessed: number;
     pagesProcessed: number;
@@ -299,11 +325,13 @@ async function heliusAssetsPage(collectionAddress: string, page: number, limit: 
 
   if (response.status === 429) throw new Error("Helius rate limit hit");
   if (!response.ok) throw new Error(`Helius request failed: ${response.status} ${response.statusText}`);
-  const payload = await response.json() as { result?: { items?: unknown[]; total?: number }; error?: { message?: string } };
+  const payload = await response.json() as { result?: { items?: unknown[]; total?: number; page?: number; limit?: number }; error?: { message?: string } };
   if (payload.error) throw new Error(payload.error.message ?? "Helius returned an error");
   return {
     items: Array.isArray(payload.result?.items) ? payload.result.items : [],
     total: typeof payload.result?.total === "number" ? payload.result.total : null,
+    page: typeof payload.result?.page === "number" ? payload.result.page : null,
+    limit: typeof payload.result?.limit === "number" ? payload.result.limit : null,
   };
 }
 
@@ -410,6 +438,13 @@ function initCollectionReport(collection: TargetNftCollectionConfig): Collection
     skippedCollection: false,
     pagesScanned: 0,
     heliusReportedTotal: null,
+    requestedGroupKey: "collection",
+    requestedLimit: DEFAULT_PAGE_LIMIT,
+    expectedPagesFromTotal: null,
+    totalCountedByScript: 0,
+    stopReason: null,
+    paginationWarnings: [],
+    paginationDebug: [],
     assetsSeen: 0,
     previousFilterMatchedAssets: 0,
     previousFilterMatchedCards: 0,
@@ -527,6 +562,7 @@ export function getLatestNftUniverseComparisonReportPath() {
 export async function ingestAllowedCollections(options: IngestAllowedCollectionsOptions = {}): Promise<NftUniverseIngestionReport> {
   const countOnly = options.countOnly ?? false;
   const dryRun = countOnly ? true : options.dryRun ?? true;
+  const debugPagination = options.debugPagination ?? false;
   const delayMs = Math.max(Math.trunc(options.delayMs ?? 30_000), 0);
   const pageLimit = DEFAULT_PAGE_LIMIT;
   const limitPages = options.limitPages ?? null;
@@ -558,16 +594,23 @@ export async function ingestAllowedCollections(options: IngestAllowedCollections
       const collectionReport = initCollectionReport(collection);
       collectionReports.push(collectionReport);
 
-      if (collectionReport.stagingCollection && !includeStaging) {
-        collectionReport.skippedCollection = true;
-        addCount(collectionReport.excluded, "staging_collection");
-        continue;
-      }
+    if (collectionReport.stagingCollection && !includeStaging) {
+      collectionReport.skippedCollection = true;
+      collectionReport.stopReason = "staging_collection";
+      addCount(collectionReport.excluded, "staging_collection");
+      continue;
+    }
 
       let page = 1;
       while (true) {
-        if (limitPages && collectionReport.pagesScanned >= limitPages) break;
-        if (limitAssets && totalProcessedAssets >= limitAssets) break;
+        if (limitPages && collectionReport.pagesScanned >= limitPages) {
+          collectionReport.stopReason = "page reached maxPages";
+          break;
+        }
+        if (limitAssets && totalProcessedAssets >= limitAssets) {
+          collectionReport.stopReason = "maxAssets reached";
+          break;
+        }
 
         if (!dryRun) updateIngestionState({
           running: true,
@@ -586,14 +629,17 @@ export async function ingestAllowedCollections(options: IngestAllowedCollections
         } catch (error) {
           const message = error instanceof Error ? error.message : "unknown error";
           collectionReport.errors.push(message);
+          collectionReport.stopReason = "API error";
           if (!dryRun) updateIngestionState({ running: true, lastError: message, inserted, updated, duplicatesSkipped });
           break;
         }
 
         collectionReport.pagesScanned += 1;
         collectionReport.heliusReportedTotal = result.total;
+        collectionReport.expectedPagesFromTotal = typeof result.total === "number" ? Math.ceil(result.total / pageLimit) : null;
         console.log(`[COLLECTION INGESTION] Assets found: ${result.items.length}`);
 
+        let newMintsThisPage = 0;
         for (const raw of result.items) {
           if (limitAssets && totalProcessedAssets >= limitAssets) break;
           collectionReport.assetsSeen += 1;
@@ -611,6 +657,7 @@ export async function ingestAllowedCollections(options: IngestAllowedCollections
             continue;
           }
           seenMints.add(candidate.mint);
+          newMintsThisPage += 1;
 
           if (candidate.previousFilterMatched) collectionReport.previousFilterMatchedAssets += 1;
           if (candidate.previousFilterMatchedCard) collectionReport.previousFilterMatchedCards += 1;
@@ -670,13 +717,71 @@ export async function ingestAllowedCollections(options: IngestAllowedCollections
             }
           }
         }
+        collectionReport.totalCountedByScript = collectionReport.assetsSeen;
 
-        if (result.items.length === 0) break;
-        if (typeof result.total === "number" && page * pageLimit >= result.total) break;
-        if (result.items.length < pageLimit) break;
-        if (limitAssets && totalProcessedAssets >= limitAssets) break;
+        const debugEntry: PaginationDebugEntry = {
+          collection: collection.label,
+          groupKey: "collection",
+          groupValue: collection.collectionAddress,
+          requestedPage: page,
+          requestedLimit: pageLimit,
+          resultPage: result.page,
+          resultLimit: result.limit,
+          resultTotal: result.total,
+          itemsLength: result.items.length,
+          cumulativeCount: collectionReport.assetsSeen,
+          totalGreaterThanItemsLength: typeof result.total === "number" && result.total > result.items.length,
+          stopCondition: null,
+        };
+        collectionReport.paginationDebug.push(debugEntry);
+        if (debugPagination) {
+          console.log(`[PAGINATION DEBUG] collection=${collection.label} page=${page} limit=${pageLimit} result.total=${result.total ?? "null"} items=${result.items.length} cumulative=${collectionReport.assetsSeen}`);
+        }
+
+        if (result.items.length === 0) {
+          debugEntry.stopCondition = "items.length === 0";
+          collectionReport.stopReason = "items.length === 0";
+          if (debugPagination) console.log(`[PAGINATION DEBUG] stop=${debugEntry.stopCondition}`);
+          break;
+        }
+        if (result.items.length > 0 && newMintsThisPage === 0) {
+          debugEntry.stopCondition = "duplicate page";
+          collectionReport.stopReason = "duplicate page";
+          collectionReport.paginationWarnings.push("page returned items but all mints were already seen in this run");
+          if (debugPagination) console.log(`[PAGINATION DEBUG] stop=${debugEntry.stopCondition}`);
+          break;
+        }
+        if (limitPages && collectionReport.pagesScanned >= limitPages) {
+          debugEntry.stopCondition = "page reached maxPages";
+          collectionReport.stopReason = "page reached maxPages";
+          if (debugPagination) console.log(`[PAGINATION DEBUG] stop=${debugEntry.stopCondition}`);
+          break;
+        }
+        if (result.items.length < pageLimit) {
+          debugEntry.stopCondition = "items.length < limit";
+          collectionReport.stopReason = "items.length < limit";
+          if (debugPagination) console.log(`[PAGINATION DEBUG] stop=${debugEntry.stopCondition}`);
+          break;
+        }
+        if (typeof result.total === "number" && page * pageLimit >= result.total) {
+          collectionReport.paginationWarnings.push("result.total was reached but the page was full; continuing because Helius total may be capped");
+        }
+        if (limitAssets && totalProcessedAssets >= limitAssets) {
+          debugEntry.stopCondition = "maxAssets reached";
+          collectionReport.stopReason = "maxAssets reached";
+          break;
+        }
         page += 1;
         if (delayMs > 0) await new Promise((resolve) => setTimeout(resolve, delayMs));
+      }
+      if (collectionReport.pagesScanned === 1 && collectionReport.heliusReportedTotal && collectionReport.heliusReportedTotal > pageLimit) {
+        collectionReport.paginationWarnings.push("result.total is greater than one page but only one page was scanned");
+      }
+      if (collectionReport.assetsSeen === pageLimit) {
+        collectionReport.paginationWarnings.push("counted total is exactly the requested page limit; result may be capped");
+      }
+      if (collectionReport.assetsSeen === pageLimit && collectionReport.stopReason === "page * limit >= total") {
+        collectionReport.paginationWarnings.push("collection stopped at 1000 because result.total matched the requested page limit");
       }
     }
   } finally {
@@ -708,6 +813,7 @@ export async function ingestAllowedCollections(options: IngestAllowedCollections
     options: {
       dryRun,
       countOnly,
+      debugPagination,
       delayMs,
       resume,
       includeStaging,
@@ -723,6 +829,7 @@ export async function ingestAllowedCollections(options: IngestAllowedCollections
       stagingCollection: isStagingText(collection.label, collection.collectionAddress),
     })),
     collections: collectionReports,
+    paginationDebug: Object.fromEntries(collectionReports.map((collection) => [collection.key, collection.paginationDebug])),
     totals,
     comparison: {
       previousFilterMatchedAssets: totals.previousFilterMatchedAssets,
