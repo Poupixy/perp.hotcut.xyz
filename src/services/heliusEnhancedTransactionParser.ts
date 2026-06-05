@@ -28,7 +28,7 @@ function numberFromUnknown(value: unknown): number | null {
 function firstString(...values: unknown[]) {
   for (const value of values) {
     const result = asString(value);
-    if (result) return result;
+    if (result && result.toUpperCase() !== "UNKNOWN") return result;
   }
   return null;
 }
@@ -45,6 +45,71 @@ function detectEventType(tx: Record<string, unknown>): RwaNftMarketEventType | n
   if (typeText.includes("PRICE")) return "PRICE_UPDATED";
   if (typeText.includes("TRANSFER")) return "TRANSFER";
   return null;
+}
+
+function isNftTransfer(transfer: Record<string, unknown>) {
+  const tokenStandard = String(transfer.tokenStandard ?? "").toLowerCase();
+  return tokenStandard.includes("nonfungible") && Boolean(asString(transfer.mint));
+}
+
+function isUsdcMint(mint: unknown) {
+  return asString(mint) === "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+}
+
+function findTransferSaleFallback(tx: Record<string, unknown>, fallbackMint?: string | null): RwaNftMarketEvent | null {
+  const tokenTransfers = recordArray(tx.tokenTransfers);
+  const nativeTransfers = recordArray(tx.nativeTransfers);
+  const nftTransfer = tokenTransfers.find((transfer) => {
+    if (!isNftTransfer(transfer)) return false;
+    const mint = asString(transfer.mint);
+    return !fallbackMint || mint === fallbackMint;
+  });
+
+  if (!nftTransfer) return null;
+
+  const mint = asString(nftTransfer.mint);
+  const seller = asString(nftTransfer.fromUserAccount);
+  const owner = asString(nftTransfer.toUserAccount);
+  if (!mint || !seller || !owner || seller === owner) return null;
+
+  const nativePayment = nativeTransfers.find((transfer) => {
+    const amount = numberFromUnknown(transfer.amount);
+    const payer = asString(transfer.fromUserAccount);
+    return amount !== null && amount > 0 && Boolean(payer) && payer !== seller && asString(transfer.toUserAccount) === seller;
+  });
+  const fungiblePayment = tokenTransfers.find((transfer) => {
+    const amount = numberFromUnknown(transfer.tokenAmount);
+    const tokenStandard = String(transfer.tokenStandard ?? "").toLowerCase();
+    const payer = asString(transfer.fromUserAccount);
+    return tokenStandard === "fungible" && amount !== null && amount > 0 && Boolean(payer) && payer !== seller && asString(transfer.toUserAccount) === seller;
+  });
+
+  if (!nativePayment && !fungiblePayment) return null;
+
+  const buyer = asString(fungiblePayment?.fromUserAccount) ?? asString(nativePayment?.fromUserAccount);
+  if (!buyer) return null;
+
+  const nativeAmount = numberFromUnknown(nativePayment?.amount);
+  const fungibleAmount = numberFromUnknown(fungiblePayment?.tokenAmount);
+  const priceSol = nativeAmount ? nativeAmount / 1_000_000_000 : null;
+  const priceUsd = isUsdcMint(fungiblePayment?.mint) ? fungibleAmount : null;
+  const marketplace = firstString(tx.source, tx.marketplace);
+
+  return {
+    mint,
+    category: null,
+    eventType: "SALE",
+    priceSol,
+    priceUsd,
+    marketplace,
+    txSignature: firstString(tx.signature, tx.transactionSignature, tx.txHash),
+    buyer,
+    seller,
+    owner,
+    eventAt: timestampFromTx(tx),
+    source: "helius_enhanced_tx",
+    rawPayload: tx,
+  };
 }
 
 function nftMintFromTx(tx: Record<string, unknown>, fallbackMint?: string | null) {
@@ -129,7 +194,11 @@ export function parseHeliusEnhancedTransaction(txPayload: unknown, options: Pars
 
   for (const tx of rows) {
     const eventType = detectEventType(tx);
-    if (!eventType) continue;
+    if (!eventType) {
+      const transferSale = findTransferSaleFallback(tx, options.fallbackMint);
+      if (transferSale) events.push(transferSale);
+      continue;
+    }
 
     const mint = nftMintFromTx(tx, options.fallbackMint);
     if (!mint) continue;
