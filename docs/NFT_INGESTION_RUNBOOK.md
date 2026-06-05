@@ -77,3 +77,47 @@ curl -X POST https://perp.hotcut.xyz/api/rwa-market/enrich-sale \
 - The seed command defaults to `source=manual`.
 - The event is deduplicated by `tx_signature + event_type`.
 - The page only displays verified sales that match the same visibility rules as `/api/verified-sales`.
+
+## Reviewed Verified Sales Backfill
+
+Use this flow for small controlled batches of known sale transaction signatures. Do not use it for full collection ingestion.
+
+Step 1: generate a review report without writing to SQLite.
+
+```bash
+npm run backfill:verified-sales -- --file=/tmp/sale-signatures.txt --dryRun=true --review=true --maxTransactions=50 --maxTransactionsPerMint=5 --mode=signatures --market=pokemon
+```
+
+The review command:
+
+- fetches the listed transactions from Helius Enhanced Transactions
+- parses only clear `SALE` events
+- fetches NFT metadata for category detection
+- uses the CLI `--market` only as a fallback when metadata cannot detect a category
+- writes a JSON report to `/app/data/backfill-reports`
+- does not write sale rows to SQLite
+
+Step 2: commit exactly one reviewed report.
+
+```bash
+npm run backfill:verified-sales -- --commitReport=/app/data/backfill-reports/<review-report>.json --dryRun=false
+```
+
+The commit command:
+
+- requires a previous `dryRun=true` and `review=true` report
+- does not call Helius again
+- does not reinterpret categories
+- writes only accepted sales from the reviewed report
+- keeps rejected transactions unsaved
+- creates a SQLite backup unless `--skipBackup=true` is provided
+- skips duplicate `tx_signature + event_type` rows
+- writes a new commit report to `/app/data/backfill-reports`
+
+Validation after commit:
+
+```bash
+npm run check:verified-sales
+npm run validate:rwa-market
+npm run validate:nft-db
+```

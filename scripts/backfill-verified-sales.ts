@@ -3,7 +3,7 @@ import { basename, dirname, join } from "node:path";
 import { parseHeliusEnhancedTransaction } from "../src/services/heliusEnhancedTransactionParser";
 import { getAssetByMint, normalizeHeliusAsset } from "../src/services/heliusNftService";
 import { ALLOWED_RWA_NFT_CATEGORIES, detectRwaNftCategory, isAllowedRwaNftCategory } from "../src/services/nftCategoryService";
-import { nftDatabasePath } from "../src/services/nftSqliteDb";
+import { getNftDb, nftDatabasePath, stringifyJson } from "../src/services/nftSqliteDb";
 import { addTrackedNft, findTrackedNft, getStoredAsset, saveNormalizedAsset } from "../src/services/nftStore";
 import { saveRwaNftMarketEvent } from "../src/services/rwaNftMarketEventService";
 import type { NftAssetRow, NormalizedNftAsset, TrackedNftRow } from "../src/services/nftTypes";
@@ -18,7 +18,8 @@ type ResultStatus = "accepted" | "rejected" | "saved" | "duplicate" | "error";
 type RuntimeEnv = Record<string, string | undefined>;
 
 type ParsedArgs = {
-  file: string;
+  file: string | null;
+  commitReport: string | null;
   mode: InputMode;
   dryRun: boolean;
   review: boolean;
@@ -49,6 +50,21 @@ type BackfillResult = {
   heliusType?: string | null;
   heliusSource?: string | null;
   warning?: string | null;
+  rawSaleEvent?: RwaNftMarketEvent | null;
+  assetSnapshot?: {
+    mint: string;
+    market: string;
+    name: string | null;
+    description: string | null;
+    image: string | null;
+    owner: string | null;
+    collection: string | null;
+    category: string | null;
+    attributes: unknown[];
+    tokenStandard: string | null;
+    interface: string | null;
+    updatedAt: string;
+  } | null;
 };
 
 type MetadataResolution = {
@@ -93,20 +109,27 @@ function inferMode(file: string): InputMode {
 
 function parseArgs(): ParsedArgs {
   const file = arg("--file")?.trim();
-  if (!file) throw new Error("--file is required");
+  const commitReport = arg("--commitReport")?.trim() || null;
+  if (!file && !commitReport) throw new Error("--file is required for review, or --commitReport is required for commit");
+  if (file && commitReport) throw new Error("Use either --file or --commitReport, not both");
 
   const modeArg = arg("--mode")?.trim();
-  const mode = modeArg === "mints" || modeArg === "signatures" ? modeArg : inferMode(file);
+  const mode = file && (modeArg === "mints" || modeArg === "signatures") ? modeArg : file ? inferMode(file) : "signatures";
   const market = arg("--market")?.trim() || null;
   if (market && !ALLOWED_RWA_NFT_CATEGORIES.includes(market as never)) {
     throw new Error(`market is not allowed: ${market}. Allowed: ${ALLOWED_RWA_NFT_CATEGORIES.join(", ")}`);
   }
+  const dryRun = boolArg("--dryRun", true);
+  const review = boolArg("--review", false);
+  if (review && !dryRun) throw new Error("--review=true must be run with --dryRun=true");
+  if (commitReport && dryRun) throw new Error("--commitReport requires --dryRun=false");
 
   return {
-    file,
+    file: file ?? null,
+    commitReport,
     mode,
-    dryRun: boolArg("--dryRun", true),
-    review: boolArg("--review", false),
+    dryRun,
+    review,
     allowUnknown: boolArg("--allowUnknown", false),
     skipBackup: boolArg("--skipBackup", false),
     maxTransactions: Math.min(numberArg("--maxTransactions", 50), 50),
@@ -126,6 +149,10 @@ function readItems(file: string) {
       seen.add(line);
       return true;
     });
+}
+
+function readJsonFile<T>(path: string): T {
+  return JSON.parse(readFileSync(path, "utf8")) as T;
 }
 
 function requireApiKey() {
@@ -205,6 +232,10 @@ function backupSqliteIfNeeded(args: ParsedArgs, slug: string) {
   return backupPath;
 }
 
+function stableId(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "unknown";
+}
+
 function detectCategoryFromNormalized(asset: NormalizedNftAsset | null, storedAsset: NftAssetRow | null): RwaNftCategory {
   if (asset) {
     return detectRwaNftCategory({
@@ -274,6 +305,24 @@ async function resolveMetadata(mint: string, args: ParsedArgs, cache: Map<string
   };
   cache.set(mint, result);
   return result;
+}
+
+function assetSnapshotFromMetadata(metadata: MetadataResolution): BackfillResult["assetSnapshot"] {
+  if (!metadata.normalized) return null;
+  return {
+    mint: metadata.normalized.mint,
+    market: metadata.category,
+    name: metadata.normalized.name,
+    description: metadata.normalized.description,
+    image: metadata.normalized.image,
+    owner: metadata.normalized.owner,
+    collection: metadata.normalized.collection,
+    category: metadata.category,
+    attributes: metadata.normalized.attributes,
+    tokenStandard: metadata.normalized.tokenStandard,
+    interface: metadata.normalized.interface,
+    updatedAt: metadata.normalized.updatedAt,
+  };
 }
 
 function validateParsedSale(tx: unknown): { event: RwaNftMarketEvent | null; result: BackfillResult } {
@@ -384,6 +433,78 @@ async function ensureAssetForSave(event: RwaNftMarketEvent, metadata: MetadataRe
   return storedAsset;
 }
 
+async function ensureAssetFromReviewedResult(result: BackfillResult): Promise<NftAssetRow> {
+  if (!result.mint) throw new Error("reviewed sale is missing mint");
+  if (!isAllowedRwaNftCategory(result.category)) throw new Error("reviewed sale category is not allowed");
+
+  const existingAsset = await getStoredAsset(result.mint);
+  if (existingAsset) return existingAsset;
+  if (!result.assetSnapshot) throw new Error("reviewed sale is missing assetSnapshot");
+
+  const existingTracked = await findTrackedNft(result.mint);
+  const timestamp = new Date().toISOString();
+  const trackedId = existingTracked?.id ?? stableId(result.mint);
+  getNftDb().prepare(`
+    INSERT INTO tracked_nfts (id, mint, market, label, active, created_at, updated_at, last_fetched_at)
+    VALUES (?, ?, ?, ?, 1, ?, ?, ?)
+    ON CONFLICT(mint) DO UPDATE SET
+      market = CASE
+        WHEN tracked_nfts.market IS NULL OR tracked_nfts.market = '' OR tracked_nfts.market = 'unknown' THEN excluded.market
+        ELSE tracked_nfts.market
+      END,
+      label = COALESCE(tracked_nfts.label, excluded.label),
+      active = 1,
+      updated_at = excluded.updated_at,
+      last_fetched_at = COALESCE(tracked_nfts.last_fetched_at, excluded.last_fetched_at)
+  `).run(trackedId, result.mint, result.category, result.nftName ?? "Reviewed verified sale NFT", existingTracked?.created_at ?? timestamp, timestamp, result.assetSnapshot.updatedAt);
+
+  getNftDb().prepare(`
+    INSERT INTO nft_assets (
+      id, mint, market, name, description, image, owner, collection, category, attributes_json,
+      token_standard, interface, source_collection, is_staging, raw_helius_json, is_listed,
+      listed_price_sol, listed_price_usd, listing_marketplace, listing_updated_at,
+      last_sale_price_sol, last_sale_price_usd, last_sale_at, last_sale_marketplace, last_sale_tx_signature,
+      floor_price_sol, market_updated_at, updated_at, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, ?, ?)
+    ON CONFLICT(mint) DO UPDATE SET
+      market = nft_assets.market,
+      name = COALESCE(nft_assets.name, excluded.name),
+      description = COALESCE(nft_assets.description, excluded.description),
+      image = COALESCE(nft_assets.image, excluded.image),
+      owner = COALESCE(nft_assets.owner, excluded.owner),
+      collection = COALESCE(nft_assets.collection, excluded.collection),
+      category = CASE
+        WHEN nft_assets.category IS NULL OR nft_assets.category = '' OR nft_assets.category = 'unknown' THEN excluded.category
+        ELSE nft_assets.category
+      END,
+      attributes_json = COALESCE(nft_assets.attributes_json, excluded.attributes_json),
+      token_standard = COALESCE(nft_assets.token_standard, excluded.token_standard),
+      interface = COALESCE(nft_assets.interface, excluded.interface),
+      source_collection = COALESCE(nft_assets.source_collection, excluded.source_collection),
+      updated_at = excluded.updated_at
+  `).run(
+    stableId(result.mint),
+    result.mint,
+    result.category,
+    result.assetSnapshot.name,
+    result.assetSnapshot.description,
+    result.assetSnapshot.image,
+    result.assetSnapshot.owner,
+    result.assetSnapshot.collection,
+    result.category,
+    stringifyJson(result.assetSnapshot.attributes),
+    result.assetSnapshot.tokenStandard,
+    result.assetSnapshot.interface,
+    result.assetSnapshot.collection,
+    result.assetSnapshot.updatedAt,
+    timestamp,
+  );
+
+  const saved = await getStoredAsset(result.mint);
+  if (!saved) throw new Error("failed to save reviewed asset snapshot");
+  return saved;
+}
+
 async function maybeSave(event: RwaNftMarketEvent | null, result: BackfillResult, metadata: MetadataResolution | null, args: ParsedArgs): Promise<BackfillResult> {
   if (args.dryRun || result.status !== "accepted" || !event || !metadata) return result;
 
@@ -436,9 +557,11 @@ function writeReport(args: ParsedArgs, slug: string, results: BackfillResult[], 
   const rejected = results.filter((row) => row.status === "rejected" || row.status === "error");
   const report = {
     inputFile: args.file,
+    committedFromReport: args.commitReport,
     mode: args.mode,
     dryRun: args.dryRun,
     review: args.review,
+    inputItems: inputCount,
     totalSignatures: checkedCount,
     acceptedCount: accepted.length,
     savedCount: results.filter((row) => row.status === "saved").length,
@@ -457,8 +580,85 @@ function writeReport(args: ParsedArgs, slug: string, results: BackfillResult[], 
   return { path, report };
 }
 
+async function saveReviewedResult(result: BackfillResult): Promise<BackfillResult> {
+  if (result.status !== "accepted" && result.status !== "saved" && result.status !== "duplicate") return result;
+  if (!result.rawSaleEvent) return { ...result, status: "error", reason: "reviewed sale is missing rawSaleEvent" };
+  if (!isAllowedRwaNftCategory(result.category)) return { ...result, status: "error", reason: "reviewed sale category is not allowed" };
+
+  try {
+    await ensureAssetFromReviewedResult(result);
+    const saved = await saveRwaNftMarketEvent({
+      ...result.rawSaleEvent,
+      category: result.category,
+      source: "helius_enhanced_tx",
+    });
+    if (saved.saved) return { ...result, status: "saved", reason: "saved to rwa_nft_events" };
+    if (saved.reason === "duplicate") return { ...result, status: "duplicate", reason: "duplicate tx_signature + event_type skipped" };
+    return { ...result, status: "error", reason: saved.reason };
+  } catch (error) {
+    return { ...result, status: "error", reason: error instanceof Error ? error.message : "save failed" };
+  }
+}
+
+async function commitReviewedReport(args: ParsedArgs) {
+  if (!args.commitReport) throw new Error("--commitReport is required");
+  const sourceReport = readJsonFile<{
+    dryRun?: boolean;
+    review?: boolean;
+    acceptedSales?: BackfillResult[];
+    rejectedTransactions?: BackfillResult[];
+  }>(args.commitReport);
+
+  if (!sourceReport.dryRun || !sourceReport.review) {
+    throw new Error("Commit requires a previously generated dryRun review report");
+  }
+
+  const slug = timestampSlug();
+  const backupPath = backupSqliteIfNeeded(args, slug);
+  const acceptedSales = sourceReport.acceptedSales ?? [];
+  const rejectedTransactions = sourceReport.rejectedTransactions ?? [];
+  const results: BackfillResult[] = [];
+
+  for (const sale of acceptedSales) {
+    if (sale.status !== "accepted") {
+      results.push({ ...sale, status: "rejected", reason: `review status is not accepted: ${sale.status}` });
+      continue;
+    }
+    if (!isAllowedRwaNftCategory(sale.category)) {
+      results.push({ ...sale, status: "rejected", reason: "reviewed category is not allowed" });
+      continue;
+    }
+    results.push(await saveReviewedResult(sale));
+  }
+
+  for (const rejected of rejectedTransactions) {
+    results.push({ ...rejected, status: "rejected" });
+  }
+
+  const { path } = writeReport(args, slug, results, backupPath, acceptedSales.length + rejectedTransactions.length, acceptedSales.length + rejectedTransactions.length);
+  const summary = {
+    mode: "commitReport",
+    dryRun: false,
+    review: false,
+    sourceReport: args.commitReport,
+    acceptedFromReport: acceptedSales.length,
+    rejectedFromReport: rejectedTransactions.length,
+    saved: results.filter((row) => row.status === "saved").length,
+    skippedDuplicates: results.filter((row) => row.status === "duplicate").length,
+    rejected: results.filter((row) => row.status === "rejected").length,
+    errors: results.filter((row) => row.status === "error").length,
+  };
+  console.log(JSON.stringify({ summary, reportPath: path, results }, null, 2));
+  if (summary.errors > 0) process.exitCode = 1;
+}
+
 async function main() {
   const args = parseArgs();
+  if (args.commitReport) {
+    await commitReviewedReport(args);
+    return;
+  }
+  if (!args.file) throw new Error("--file is required");
   const slug = timestampSlug();
   const items = readItems(args.file);
   const signatures = await collectSignatures(args, items);
@@ -491,6 +691,12 @@ async function main() {
       result.category = metadata.category;
       result.categorySource = metadata.categorySource;
       result.warning = metadata.warning;
+      result.assetSnapshot = assetSnapshotFromMetadata(metadata);
+      result.rawSaleEvent = {
+        ...event,
+        category: metadata.category,
+        rawPayload: args.review ? null : event.rawPayload,
+      };
 
       if (!isAllowedRwaNftCategory(metadata.category)) {
         results.push({
