@@ -6,6 +6,13 @@ function optionalNumber(value: string | null) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function optionalBoolean(value: string | null, fallback: boolean) {
+  if (value === null) return fallback;
+  if (value === "true") return true;
+  if (value === "false") return false;
+  return fallback;
+}
+
 export const Route = createFileRoute("/api/verified-sales")({
   server: {
     handlers: {
@@ -18,9 +25,12 @@ export const Route = createFileRoute("/api/verified-sales")({
           source: url.searchParams.get("source"),
           minPriceSol: optionalNumber(url.searchParams.get("minPriceSol")),
           maxPriceSol: optionalNumber(url.searchParams.get("maxPriceSol")),
+          minPriceUsd: optionalNumber(url.searchParams.get("minPriceUsd")),
+          maxPriceUsd: optionalNumber(url.searchParams.get("maxPriceUsd")),
           startDate: url.searchParams.get("startDate"),
           endDate: url.searchParams.get("endDate"),
           search: url.searchParams.get("search"),
+          hideTestSales: optionalBoolean(url.searchParams.get("hideTestSales"), true),
           page: optionalNumber(url.searchParams.get("page")) ?? 1,
           limit: optionalNumber(url.searchParams.get("limit")) ?? 50,
           sort: url.searchParams.get("sort"),

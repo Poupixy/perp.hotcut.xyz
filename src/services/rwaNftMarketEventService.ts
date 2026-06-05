@@ -10,9 +10,12 @@ export type MarketEventFilters = {
   source?: RwaNftMarketEventSource | string | null;
   minPriceSol?: number | null;
   maxPriceSol?: number | null;
+  minPriceUsd?: number | null;
+  maxPriceUsd?: number | null;
   startDate?: string | null;
   endDate?: string | null;
   search?: string | null;
+  hideTestSales?: boolean;
   page?: number;
   limit?: number;
   sort?: string | null;
@@ -221,7 +224,7 @@ export async function getLatestEvents(filters: MarketEventFilters = {}) {
   `).all(...params);
 }
 
-export async function getVerifiedSales(filters: MarketEventFilters = {}): Promise<{ sales: VerifiedSale[]; page: number; limit: number }> {
+export async function getVerifiedSales(filters: MarketEventFilters = {}): Promise<{ sales: VerifiedSale[]; page: number; limit: number; total: number }> {
   const limit = cleanLimit(filters.limit);
   const page = cleanPage(filters.page);
   const where: string[] = [
@@ -239,12 +242,16 @@ export async function getVerifiedSales(filters: MarketEventFilters = {}): Promis
     params.push(filters.category);
   }
   if (filters.marketplace && filters.marketplace !== "all") {
-    where.push("events.marketplace = ?");
-    params.push(filters.marketplace);
+    where.push("events.marketplace LIKE ?");
+    params.push(`%${filters.marketplace}%`);
   }
   if (filters.source && filters.source !== "all") {
-    where.push("events.source = ?");
-    params.push(filters.source);
+    if (filters.source === "helius") {
+      where.push("events.source IN ('helius_enhanced_tx', 'helius_webhook')");
+    } else {
+      where.push("events.source = ?");
+      params.push(filters.source);
+    }
   }
   if (typeof filters.minPriceSol === "number") {
     where.push("events.price_sol >= ?");
@@ -253,6 +260,14 @@ export async function getVerifiedSales(filters: MarketEventFilters = {}): Promis
   if (typeof filters.maxPriceSol === "number") {
     where.push("events.price_sol <= ?");
     params.push(filters.maxPriceSol);
+  }
+  if (typeof filters.minPriceUsd === "number") {
+    where.push("events.price_usd >= ?");
+    params.push(filters.minPriceUsd);
+  }
+  if (typeof filters.maxPriceUsd === "number") {
+    where.push("events.price_usd <= ?");
+    params.push(filters.maxPriceUsd);
   }
   if (filters.startDate) {
     where.push("events.event_at >= ?");
@@ -263,18 +278,42 @@ export async function getVerifiedSales(filters: MarketEventFilters = {}): Promis
     params.push(filters.endDate);
   }
   if (filters.search) {
-    where.push("(assets.name LIKE ? OR events.mint LIKE ? OR events.tx_signature LIKE ?)");
+    where.push(`(
+      assets.name LIKE ?
+      OR events.mint LIKE ?
+      OR events.tx_signature LIKE ?
+      OR events.buyer LIKE ?
+      OR events.seller LIKE ?
+      OR assets.collection LIKE ?
+      OR events.marketplace LIKE ?
+    )`);
     const needle = `%${filters.search}%`;
-    params.push(needle, needle, needle);
+    params.push(needle, needle, needle, needle, needle, needle, needle);
+  }
+  if (filters.hideTestSales ?? true) {
+    where.push("events.tx_signature NOT LIKE 'TEST_SIGNATURE%'");
   }
 
-  const order = filters.sort === "price_desc"
-    ? "events.price_sol DESC, events.event_at DESC"
-    : filters.sort === "price_asc"
-      ? "events.price_sol ASC, events.event_at DESC"
-      : "events.event_at DESC";
+  const order = filters.sort === "oldest"
+    ? "events.event_at ASC"
+    : filters.sort === "price_sol_high" || filters.sort === "price_desc"
+      ? "events.price_sol IS NULL ASC, events.price_sol DESC, events.event_at DESC"
+      : filters.sort === "price_sol_low" || filters.sort === "price_asc"
+        ? "events.price_sol IS NULL ASC, events.price_sol ASC, events.event_at DESC"
+        : filters.sort === "price_usd_high"
+          ? "events.price_usd IS NULL ASC, events.price_usd DESC, events.event_at DESC"
+          : filters.sort === "price_usd_low"
+            ? "events.price_usd IS NULL ASC, events.price_usd ASC, events.event_at DESC"
+            : "events.event_at DESC";
 
-  params.push(limit, (page - 1) * limit);
+  const totalRow = getNftDb().prepare(`
+    SELECT COUNT(*) AS count
+    FROM rwa_nft_events events
+    JOIN nft_assets assets ON assets.mint = events.mint
+    WHERE ${where.join(" AND ")}
+  `).get(...params);
+
+  const pagedParams = [...params, limit, (page - 1) * limit];
   const rows = getNftDb().prepare(`
     SELECT
       events.id, events.mint, events.category, events.price_sol, events.price_usd, events.marketplace,
@@ -286,11 +325,12 @@ export async function getVerifiedSales(filters: MarketEventFilters = {}): Promis
     WHERE ${where.join(" AND ")}
     ORDER BY ${order}
     LIMIT ? OFFSET ?
-  `).all(...params);
+  `).all(...pagedParams);
 
   return {
     page,
     limit,
+    total: Number(totalRow?.count ?? 0),
     sales: rows.map((row): VerifiedSale => ({
       id: String(row.id),
       mint: String(row.mint),
