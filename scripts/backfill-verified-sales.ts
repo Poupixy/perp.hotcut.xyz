@@ -44,7 +44,9 @@ type BackfillResult = {
   owner?: string | null;
   priceSol?: number | null;
   priceUsd?: number | null;
+  paymentMint?: string | null;
   paymentSymbol?: string | null;
+  paymentAmount?: number | null;
   marketplace?: string | null;
   timestamp?: string | null;
   heliusType?: string | null;
@@ -197,9 +199,10 @@ function record(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
 
-function paymentSymbolForSale(sale: { priceSol: number | null; priceUsd: number | null }) {
-  if (sale.priceUsd !== null && sale.priceUsd !== undefined) return "USDC/USD";
+function paymentSymbolForSale(sale: { paymentSymbol?: string | null; priceSol: number | null; priceUsd: number | null }) {
+  if (sale.paymentSymbol) return sale.paymentSymbol;
   if (sale.priceSol !== null && sale.priceSol !== undefined) return "SOL";
+  if (sale.priceUsd !== null && sale.priceUsd !== undefined) return "USDC";
   return null;
 }
 
@@ -359,7 +362,9 @@ function validateParsedSale(tx: unknown): { event: RwaNftMarketEvent | null; res
     owner: sale.owner,
     priceSol: sale.priceSol,
     priceUsd: sale.priceUsd,
+    paymentMint: sale.paymentMint ?? null,
     paymentSymbol: paymentSymbolForSale(sale),
+    paymentAmount: sale.paymentAmount ?? sale.priceSol ?? sale.priceUsd ?? null,
     marketplace: sale.marketplace,
     timestamp: sale.eventAt,
     heliusType: String(txRow.type ?? "") || null,

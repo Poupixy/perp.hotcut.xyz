@@ -127,6 +127,20 @@ function runNftMigrations(database: DatabaseSync) {
     INSERT OR IGNORE INTO queue_state (id, queue_json, processing, updated_at)
     VALUES ('default', '[]', 0, ?)
   `).run(new Date().toISOString());
+
+  addColumnIfMissing(database, "rwa_nft_events", "payment_mint", "TEXT");
+  addColumnIfMissing(database, "rwa_nft_events", "payment_symbol", "TEXT");
+  addColumnIfMissing(database, "rwa_nft_events", "payment_amount", "REAL");
+  database.exec(`
+    CREATE INDEX IF NOT EXISTS idx_rwa_nft_events_payment_symbol ON rwa_nft_events(payment_symbol);
+    CREATE INDEX IF NOT EXISTS idx_rwa_nft_events_payment_mint ON rwa_nft_events(payment_mint);
+  `);
+}
+
+function addColumnIfMissing(database: DatabaseSync, table: string, column: string, definition: string) {
+  const columns = database.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name?: string }>;
+  if (columns.some((row) => row.name === column)) return;
+  database.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
 }
 
 export function parseJson<T>(value: unknown, fallback: T): T {

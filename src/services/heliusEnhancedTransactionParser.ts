@@ -4,6 +4,8 @@ type ParseOptions = {
   fallbackMint?: string | null;
 };
 
+const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
@@ -53,7 +55,38 @@ function isNftTransfer(transfer: Record<string, unknown>) {
 }
 
 function isUsdcMint(mint: unknown) {
-  return asString(mint) === "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+  return asString(mint) === USDC_MINT;
+}
+
+function tokenSymbolFromMint(mint: string | null) {
+  if (!mint) return "SOL";
+  if (mint === USDC_MINT) return "USDC";
+  return "UNKNOWN";
+}
+
+function withParserMetadata(tx: Record<string, unknown>, metadata: Record<string, unknown>) {
+  return {
+    ...tx,
+    _perpRwa: {
+      ...(asRecord(tx._perpRwa)),
+      ...metadata,
+    },
+  };
+}
+
+function nativePaymentAmount(transfer: Record<string, unknown> | undefined) {
+  const amount = numberFromUnknown(transfer?.amount);
+  return amount !== null && amount > 100_000 ? amount / 1_000_000_000 : amount;
+}
+
+function fungiblePaymentDetails(transfer: Record<string, unknown> | undefined) {
+  if (!transfer) return { paymentMint: null, paymentSymbol: null, paymentAmount: null };
+  const paymentMint = asString(transfer.mint);
+  return {
+    paymentMint,
+    paymentSymbol: tokenSymbolFromMint(paymentMint),
+    paymentAmount: numberFromUnknown(transfer.tokenAmount),
+  };
 }
 
 function findTransferSaleFallback(tx: Record<string, unknown>, fallbackMint?: string | null): RwaNftMarketEvent | null {
@@ -93,6 +126,10 @@ function findTransferSaleFallback(tx: Record<string, unknown>, fallbackMint?: st
   const fungibleAmount = numberFromUnknown(fungiblePayment?.tokenAmount);
   const priceSol = nativeAmount ? nativeAmount / 1_000_000_000 : null;
   const priceUsd = isUsdcMint(fungiblePayment?.mint) ? fungibleAmount : null;
+  const fungibleDetails = fungiblePaymentDetails(fungiblePayment);
+  const paymentMint = fungibleDetails.paymentMint;
+  const paymentSymbol = fungibleDetails.paymentSymbol ?? (nativePayment ? "SOL" : null);
+  const paymentAmount = fungibleDetails.paymentAmount ?? nativePaymentAmount(nativePayment);
   const marketplace = firstString(tx.source, tx.marketplace);
 
   return {
@@ -101,6 +138,9 @@ function findTransferSaleFallback(tx: Record<string, unknown>, fallbackMint?: st
     eventType: "SALE",
     priceSol,
     priceUsd,
+    paymentMint,
+    paymentSymbol,
+    paymentAmount,
     marketplace,
     txSignature: firstString(tx.signature, tx.transactionSignature, tx.txHash),
     buyer,
@@ -108,7 +148,13 @@ function findTransferSaleFallback(tx: Record<string, unknown>, fallbackMint?: st
     owner,
     eventAt: timestampFromTx(tx),
     source: "helius_enhanced_tx",
-    rawPayload: tx,
+    rawPayload: withParserMetadata(tx, {
+      fallbackVerified: true,
+      fallbackReason: "Helius type was UNKNOWN and parser detected NFT transfer plus payment transfer",
+      paymentMint,
+      paymentSymbol,
+      paymentAmount,
+    }),
   };
 }
 
@@ -191,6 +237,45 @@ function buyerSellerFromTransfers(tx: Record<string, unknown>) {
   };
 }
 
+function paymentFromTransfers(tx: Record<string, unknown>, buyer: string | null, seller: string | null) {
+  const nativeTransfers = recordArray(tx.nativeTransfers);
+  const tokenTransfers = recordArray(tx.tokenTransfers);
+
+  const fungiblePayment = tokenTransfers.find((transfer) => {
+    const tokenStandard = String(transfer.tokenStandard ?? "").toLowerCase();
+    const amount = numberFromUnknown(transfer.tokenAmount);
+    const from = asString(transfer.fromUserAccount);
+    const to = asString(transfer.toUserAccount);
+    return tokenStandard === "fungible"
+      && amount !== null
+      && amount > 0
+      && (!buyer || from === buyer)
+      && (!seller || to === seller);
+  });
+
+  if (fungiblePayment) return fungiblePaymentDetails(fungiblePayment);
+
+  const nativePayment = nativeTransfers.find((transfer) => {
+    const amount = nativePaymentAmount(transfer);
+    const from = asString(transfer.fromUserAccount);
+    const to = asString(transfer.toUserAccount);
+    return amount !== null
+      && amount > 0
+      && (!buyer || from === buyer)
+      && (!seller || to === seller);
+  });
+
+  if (nativePayment) {
+    return {
+      paymentMint: null,
+      paymentSymbol: "SOL",
+      paymentAmount: nativePaymentAmount(nativePayment),
+    };
+  }
+
+  return { paymentMint: null, paymentSymbol: null, paymentAmount: null };
+}
+
 export function parseHeliusEnhancedTransaction(txPayload: unknown, options: ParseOptions = {}): RwaNftMarketEvent[] {
   const rows = Array.isArray(txPayload) ? txPayload.map(asRecord) : [asRecord(txPayload)];
   const events: RwaNftMarketEvent[] = [];
@@ -211,13 +296,19 @@ export function parseHeliusEnhancedTransaction(txPayload: unknown, options: Pars
     const marketplace = firstString(tx.source, tx.marketplace, nft.source, nft.marketplace);
     const { buyer, seller } = buyerSellerFromTransfers(tx);
     const owner = firstString(tx.owner, tx.toUserAccount, buyer);
+    const payment = eventType === "SALE" ? paymentFromTransfers(tx, buyer, seller) : { paymentMint: null, paymentSymbol: null, paymentAmount: null };
+    const priceSol = eventType === "SALE" || eventType === "LISTED" || eventType === "PRICE_UPDATED" ? solAmount(tx) : null;
+    const priceUsd = asNumber(tx.priceUsd) ?? asNumber(nft.priceUsd);
 
     events.push({
       mint,
       category: null,
       eventType,
-      priceSol: eventType === "SALE" || eventType === "LISTED" || eventType === "PRICE_UPDATED" ? solAmount(tx) : null,
-      priceUsd: asNumber(tx.priceUsd) ?? asNumber(nft.priceUsd),
+      priceSol,
+      priceUsd,
+      paymentMint: payment.paymentMint,
+      paymentSymbol: payment.paymentSymbol ?? (eventType === "SALE" && priceSol !== null ? "SOL" : null),
+      paymentAmount: payment.paymentAmount ?? (eventType === "SALE" && priceSol !== null ? priceSol : null),
       marketplace,
       txSignature: firstString(tx.signature, tx.transactionSignature, tx.txHash),
       buyer,
@@ -225,7 +316,12 @@ export function parseHeliusEnhancedTransaction(txPayload: unknown, options: Pars
       owner,
       eventAt: timestampFromTx(tx),
       source: "helius_enhanced_tx",
-      rawPayload: tx,
+      rawPayload: withParserMetadata(tx, {
+        fallbackVerified: false,
+        paymentMint: payment.paymentMint,
+        paymentSymbol: payment.paymentSymbol ?? (eventType === "SALE" && priceSol !== null ? "SOL" : null),
+        paymentAmount: payment.paymentAmount ?? (eventType === "SALE" && priceSol !== null ? priceSol : null),
+      }),
     });
   }
 

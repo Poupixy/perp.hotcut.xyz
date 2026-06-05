@@ -39,6 +39,19 @@ function asNumber(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
+function isTestSignature(value: string | null | undefined) {
+  return Boolean(value?.startsWith("TEST_SIGNATURE"));
+}
+
+function inferFallbackVerified(rawPayload: unknown) {
+  const payload = rawPayload && typeof rawPayload === "object" && !Array.isArray(rawPayload) ? rawPayload as Record<string, unknown> : {};
+  const metadata = payload._perpRwa && typeof payload._perpRwa === "object" && !Array.isArray(payload._perpRwa)
+    ? payload._perpRwa as Record<string, unknown>
+    : {};
+  if (metadata.fallbackVerified === true) return true;
+  return String(payload.type ?? payload.transactionType ?? "").toUpperCase() === "UNKNOWN" && metadata.fallbackVerified === true;
+}
+
 function cleanLimit(value: number | undefined, fallback = 50) {
   return Math.min(Math.max(Math.trunc(value ?? fallback), 1), 200);
 }
@@ -160,9 +173,9 @@ export async function saveRwaNftMarketEvent(event: RwaNftMarketEvent, options: {
   try {
     getNftDb().prepare(`
       INSERT INTO rwa_nft_events (
-        id, mint, category, event_type, price_sol, price_usd, marketplace, tx_signature,
+        id, mint, category, event_type, price_sol, price_usd, payment_mint, payment_symbol, payment_amount, marketplace, tx_signature,
         buyer, seller, owner, event_at, source, raw_payload_json, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       eventId(event),
       event.mint,
@@ -170,6 +183,9 @@ export async function saveRwaNftMarketEvent(event: RwaNftMarketEvent, options: {
       event.eventType,
       event.priceSol,
       event.priceUsd,
+      event.paymentMint ?? null,
+      event.paymentSymbol ?? null,
+      event.paymentAmount ?? null,
       event.marketplace,
       event.txSignature,
       event.buyer,
@@ -248,6 +264,9 @@ export async function getVerifiedSales(filters: MarketEventFilters = {}): Promis
   if (filters.source && filters.source !== "all") {
     if (filters.source === "helius") {
       where.push("events.source IN ('helius_enhanced_tx', 'helius_webhook')");
+    } else if (filters.source === "fallback_verified") {
+      where.push("events.raw_payload_json LIKE ?");
+      params.push('%"fallbackVerified":true%');
     } else {
       where.push("events.source = ?");
       params.push(filters.source);
@@ -316,8 +335,9 @@ export async function getVerifiedSales(filters: MarketEventFilters = {}): Promis
   const pagedParams = [...params, limit, (page - 1) * limit];
   const rows = getNftDb().prepare(`
     SELECT
-      events.id, events.mint, events.category, events.price_sol, events.price_usd, events.marketplace,
-      events.tx_signature, events.buyer, events.seller, events.event_at, events.source,
+      events.id, events.mint, events.category, events.price_sol, events.price_usd,
+      events.payment_mint, events.payment_symbol, events.payment_amount, events.marketplace,
+      events.tx_signature, events.buyer, events.seller, events.event_at, events.source, events.raw_payload_json,
       assets.name, assets.image, assets.collection, assets.owner,
       assets.last_sale_price_sol, assets.last_sale_at, assets.last_sale_marketplace
     FROM rwa_nft_events events
@@ -337,12 +357,17 @@ export async function getVerifiedSales(filters: MarketEventFilters = {}): Promis
       category: String(row.category),
       priceSol: asNumber(row.price_sol),
       priceUsd: asNumber(row.price_usd),
+      paymentMint: asString(row.payment_mint),
+      paymentSymbol: asString(row.payment_symbol),
+      paymentAmount: asNumber(row.payment_amount),
       marketplace: asString(row.marketplace),
       txSignature: String(row.tx_signature),
       buyer: asString(row.buyer),
       seller: asString(row.seller),
       eventAt: String(row.event_at),
       source: String(row.source) as RwaNftMarketEventSource,
+      fallbackVerified: inferFallbackVerified(parseJson(row.raw_payload_json, null)),
+      isTestSale: isTestSignature(String(row.tx_signature)),
       name: asString(row.name),
       image: asString(row.image),
       collection: asString(row.collection),
@@ -406,6 +431,9 @@ export function marketEventFromDbRow(row: Record<string, unknown>) {
     eventType: String(row.event_type),
     priceSol: asNumber(row.price_sol),
     priceUsd: asNumber(row.price_usd),
+    paymentMint: asString(row.payment_mint),
+    paymentSymbol: asString(row.payment_symbol),
+    paymentAmount: asNumber(row.payment_amount),
     marketplace: asString(row.marketplace),
     txSignature: asString(row.tx_signature),
     buyer: asString(row.buyer),

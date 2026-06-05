@@ -42,6 +42,8 @@ async function main() {
   const tx = requiredArg("--tx").trim();
   const marketplace = arg("--marketplace")?.trim() || "manual";
   const source = (arg("--source")?.trim() || "manual") as RwaNftMarketEventSource;
+  const paymentSymbol = priceSol !== null ? "SOL" : priceUsd !== null ? "USDC" : null;
+  const paymentAmount = priceSol ?? priceUsd;
 
   if (source !== "manual") throw new Error("--source must be manual for seed:verified-sale");
   if (!tx) throw new Error("--tx is required");
@@ -55,6 +57,9 @@ async function main() {
     eventType: "SALE",
     priceSol,
     priceUsd,
+    paymentMint: paymentSymbol === "USDC" ? "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v" : null,
+    paymentSymbol,
+    paymentAmount,
     marketplace,
     txSignature: tx,
     buyer: null,
@@ -67,6 +72,8 @@ async function main() {
       mint,
       priceSol,
       priceUsd,
+      paymentSymbol,
+      paymentAmount,
       tx,
       marketplace,
       source,

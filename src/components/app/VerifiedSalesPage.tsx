@@ -7,12 +7,17 @@ type VerifiedSale = {
   category: string;
   priceSol: number | null;
   priceUsd: number | null;
+  paymentMint: string | null;
+  paymentSymbol: string | null;
+  paymentAmount: number | null;
   marketplace: string | null;
   txSignature: string;
   buyer: string | null;
   seller: string | null;
   eventAt: string;
   source: string;
+  fallbackVerified: boolean;
+  isTestSale: boolean;
   name: string | null;
   image: string | null;
   collection: string | null;
@@ -71,7 +76,7 @@ function categoryLabel(category: string) {
 }
 
 function isTestSale(sale: VerifiedSale) {
-  return sale.txSignature.startsWith("TEST_SIGNATURE") || (sale.source === "manual" && sale.txSignature.startsWith("TEST_SIGNATURE"));
+  return sale.isTestSale || sale.txSignature.startsWith("TEST_SIGNATURE") || (sale.source === "manual" && sale.txSignature.startsWith("TEST_SIGNATURE"));
 }
 
 function isManualSale(sale: VerifiedSale) {
@@ -79,12 +84,17 @@ function isManualSale(sale: VerifiedSale) {
 }
 
 function primaryPrice(sale: VerifiedSale) {
+  if (typeof sale.paymentAmount === "number" && sale.paymentSymbol) {
+    return `${sale.paymentAmount.toLocaleString("en-US", { maximumFractionDigits: 6 })} ${sale.paymentSymbol}`;
+  }
   if (typeof sale.priceUsd === "number") return fmtUsd(sale.priceUsd);
   if (typeof sale.priceSol === "number") return fmtSol(sale.priceSol);
   return "Price unavailable";
 }
 
 function secondaryPrice(sale: VerifiedSale) {
+  if (typeof sale.paymentAmount === "number" && sale.paymentSymbol === "USDC" && typeof sale.priceUsd === "number") return fmtUsd(sale.priceUsd);
+  if (typeof sale.paymentAmount === "number" && sale.paymentSymbol === "SOL" && typeof sale.priceUsd !== "number") return "No USD conversion";
   if (typeof sale.priceUsd === "number" && typeof sale.priceSol === "number") return fmtSol(sale.priceSol);
   if (typeof sale.priceSol === "number" && sale.priceUsd === null) return "No USD conversion";
   return "";
@@ -243,6 +253,7 @@ export function VerifiedSalesPage() {
                   <div>{isManualSale(sale) ? "Manual verified" : sale.marketplace ?? "marketplace unknown"}</div>
                   <div className="mt-1 flex flex-wrap gap-1.5 text-[11px] text-muted-foreground">
                     <span className="rounded border border-border bg-surface px-1.5 py-0.5">{sourceLabel(sale.source)}</span>
+                    {sale.fallbackVerified && <span className="rounded border border-blue-400/30 bg-blue-400/10 px-1.5 py-0.5 text-blue-300">Fallback verified</span>}
                     {isTestSale(sale) && <span className="rounded border border-primary/30 bg-primary/10 px-1.5 py-0.5 text-primary">Test sale</span>}
                   </div>
                 </td>

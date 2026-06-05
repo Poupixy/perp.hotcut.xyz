@@ -33,6 +33,9 @@ export type RwaNftMarketEvent = {
   eventType: RwaNftMarketEventType;
   priceSol: number | null;
   priceUsd: number | null;
+  paymentMint?: string | null;
+  paymentSymbol?: string | null;
+  paymentAmount?: number | null;
   marketplace: string | null;
   txSignature: string | null;
   buyer: string | null;
@@ -49,12 +52,17 @@ export type VerifiedSale = {
   category: string;
   priceSol: number | null;
   priceUsd: number | null;
+  paymentMint: string | null;
+  paymentSymbol: string | null;
+  paymentAmount: number | null;
   marketplace: string | null;
   txSignature: string;
   buyer: string | null;
   seller: string | null;
   eventAt: string;
   source: RwaNftMarketEventSource;
+  fallbackVerified: boolean;
+  isTestSale: boolean;
   name: string | null;
   image: string | null;
   collection: string | null;
