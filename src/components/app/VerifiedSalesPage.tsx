@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { RelativeTime } from "./RelativeTime";
+import { categoryIcon } from "./categoryIcons";
 
 type VerifiedSale = {
   id: string;
@@ -77,8 +78,66 @@ function sourceLabel(source: string) {
   return SOURCE_OPTIONS.find(([value]) => value === source)?.[1] ?? source;
 }
 
+function marketplaceLabel(value: string | null) {
+  if (!value) return "Marketplace unknown";
+
+  const normalized = value.toLowerCase();
+
+  if (normalized === "magic_eden" || normalized === "magiceden") return "Magic Eden";
+  if (normalized === "tensor") return "Tensor";
+  if (normalized === "collector_crypt" || normalized === "collectorcrypt") return "Collector Crypt";
+  if (normalized === "phygitals" || normalized === "phygital") return "Phygitals";
+  if (normalized === "ebay") return "eBay";
+  if (normalized === "manual") return "Manual";
+
+  return value;
+}
+
+function marketplaceLogo(value: string | null) {
+  if (!value) return null;
+
+  const normalized = value.toLowerCase();
+
+  if (normalized === "magic_eden" || normalized === "magiceden") return "/magiceden.png";
+  if (normalized === "tensor") return "/tensor.png";
+  if (normalized === "collector_crypt" || normalized === "collectorcrypt") return "/collectorcrypt.png";
+  if (normalized === "phygitals" || normalized === "phygital") return "/phygitals.png";
+  if (normalized === "ebay") return "/ebay.png";
+
+  return null;
+}
+
 function categoryLabel(category: string) {
   return CATEGORY_OPTIONS.find(([value]) => value === category)?.[1] ?? category;
+}
+
+function collectionLabel(value: string | null | undefined) {
+  if (!value) return "collection unknown";
+  if (value === "CCryptWBYktukHDQ2vHGtVcmtjXxYzvw8XNVY64YN2Yf") return "Collector Crypt";
+  if (value === "BSG6DyEihFFtfvxtL9mKYsvTwiZXB1rq5gARMTJC2xAM") return "Phygitals";
+  if (value === "phygZDQZJZVHvJGYPGoKPYUtXw7mstSYtTtcuh8LJcC") return "Phygitals";
+  return value.length > 18 ? short(value) : value;
+}
+
+function NftImage({ src, name }: { src: string | null; name: string | null }) {
+  const [failed, setFailed] = useState(false);
+
+  if (!src || failed) {
+    return (
+      <div className="h-10 w-10 rounded-md bg-muted flex items-center justify-center text-[10px] text-muted-foreground">
+        NFT
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt={name ?? ""}
+      onError={() => setFailed(true)}
+      className="h-10 w-10 rounded-md object-cover bg-muted"
+    />
+  );
 }
 
 function isTestSale(sale: VerifiedSale) {
@@ -246,16 +305,16 @@ export function VerifiedSalesPage() {
         </div>
         <table className="w-full text-sm">
           <thead>
-            <tr className="text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border">
+            <tr className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground border-b border-border">
               <th className="text-left font-medium px-5 py-3">NFT</th>
-              <th className="text-left font-medium px-5 py-3">Category</th>
+              <th className="text-center font-medium px-5 py-3">Category</th>
               <th className="text-right font-medium px-5 py-3">Price</th>
-              <th className="text-right font-medium px-5 py-3">Conversion</th>
-              <th className="text-right font-medium px-5 py-3">Growth</th>
-              <th className="text-left font-medium px-5 py-3">Marketplace</th>
-              <th className="text-left font-medium px-5 py-3">Tx</th>
-              <th className="text-left font-medium px-5 py-3">Buyer / Seller</th>
-              <th className="text-right font-medium px-5 py-3">Time</th>
+              <th className="text-right font-medium px-5 py-3">USD</th>
+              <th className="text-center font-medium px-5 py-3">Growth</th>
+              <th className="text-center font-medium px-5 py-3">Market</th>
+              <th className="text-center font-medium px-5 py-3">TX</th>
+              <th className="text-center font-medium px-5 py-3">Owner</th>
+              <th className="text-right font-medium px-5 py-3">Sold</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -269,32 +328,42 @@ export function VerifiedSalesPage() {
                 <tr key={sale.id} className="hover:bg-surface-raised/40 transition">
                   <td className="px-5 py-3 min-w-[260px]">
                     <div className="flex items-center gap-3">
-                      {sale.image ? <img src={sale.image} alt="" className="h-10 w-10 rounded-md object-cover bg-muted" /> : <div className="h-10 w-10 rounded-md bg-muted" />}
+                      <NftImage src={sale.image} name={sale.name} />
                       <div className="min-w-0">
                         <div className="font-medium truncate">{sale.name ?? "Unnamed NFT"}</div>
-                        <div className="text-[11px] text-muted-foreground font-mono truncate">{short(sale.mint)} · {sale.collection ?? "collection unknown"}</div>
+                        <div className="text-[11px] text-muted-foreground truncate">{collectionLabel(sale.collection)}</div>
                       </div>
                     </div>
                   </td>
-                  <td className="px-5 py-3 text-muted-foreground">{categoryLabel(sale.category)}</td>
-                  <td className="px-5 py-3 text-right font-mono font-semibold tabular-nums">{primaryPrice(sale)}</td>
-                  <td className="px-5 py-3 text-right font-mono tabular-nums text-muted-foreground">{secondaryPrice(sale)}</td>
-                  <td className={`px-5 py-3 text-right font-mono tabular-nums ${growth.className}`}>
+                  <td className="px-5 py-3 text-center text-muted-foreground">
+                    <div className="flex items-center justify-center gap-2">
+                      {categoryIcon(sale.category) && <img src={categoryIcon(sale.category) ?? ""} alt="" className="h-5 w-5 rounded-sm object-contain" />}
+                      <span>{categoryLabel(sale.category)}</span>
+                    </div>
+                  </td>
+                    <td className="px-5 py-3 text-right font-mono font-semibold tabular-nums">{primaryPrice(sale)}</td>
+                    <td className="px-5 py-3 text-right font-mono tabular-nums text-muted-foreground">{secondaryPrice(sale)}</td>
+                    <td className={`px-5 py-3 text-center font-mono tabular-nums ${growth.className}`}>
                     <div className="font-semibold">{growth.label}</div>
                     {growth.amount && <div className="text-[11px] opacity-80">{growth.amount}</div>}
                   </td>
                   <td className="px-5 py-3">
-                    <div>{isManualSale(sale) ? "Manual verified" : sale.marketplace ?? "marketplace unknown"}</div>
-                    <div className="mt-1 flex flex-wrap gap-1.5 text-[11px] text-muted-foreground">
-                      <span className="rounded border border-border bg-surface px-1.5 py-0.5">{sourceLabel(sale.source)}</span>
-                      {sale.fallbackVerified && <span className="rounded border border-blue-400/30 bg-blue-400/10 px-1.5 py-0.5 text-blue-300">Fallback verified</span>}
-                      {isTestSale(sale) && <span className="rounded border border-primary/30 bg-primary/10 px-1.5 py-0.5 text-primary">Test sale</span>}
-                    </div>
-                  </td>
-                  <td className="px-5 py-3 font-mono text-xs text-muted-foreground">{short(sale.txSignature)}</td>
-                  <td className="px-5 py-3 text-xs text-muted-foreground">
-                    <div>Buyer: <span className="font-mono">{sale.buyer ? short(sale.buyer) : "unknown"}</span></div>
-                    <div>Seller: <span className="font-mono">{sale.seller ? short(sale.seller) : "unknown"}</span></div>
+                    <div className="flex items-center justify-center">
+                        {marketplaceLogo(sale.marketplace) ? (
+                          <img
+                            src={marketplaceLogo(sale.marketplace) ?? ""}
+                            alt={marketplaceLabel(sale.marketplace)}
+                            className="h-5 w-5 rounded-sm object-contain"
+                          />
+                        ) : (
+                          <span className="text-xs text-muted-foreground">
+                            {isManualSale(sale) ? "Manual" : marketplaceLabel(sale.marketplace)}
+                          </span>
+                        )}
+                      </div>
+                  </td>               
+                  <td className="px-5 py-3 text-center text-xs text-muted-foreground">
+                    <span className="font-mono">{sale.buyer ? sale.buyer.slice(0, 4) : "unknown"}</span>
                   </td>
                   <td className="px-5 py-3 text-right text-xs text-muted-foreground"><RelativeTime iso={sale.eventAt} /></td>
                 </tr>

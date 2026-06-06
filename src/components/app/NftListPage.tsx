@@ -1,0 +1,352 @@
+import { useEffect, useMemo, useState } from "react";
+import { RelativeTime } from "./RelativeTime";
+import { categoryIcon } from "./categoryIcons";
+
+type NftAsset = {
+  mint: string;
+  name: string | null;
+  image: string | null;
+  owner: string | null;
+  collection: string | null;
+  sourceCollection: string | null;
+  category: string;
+  assetType: string;
+  publicGroup: string;
+  isStaging: boolean;
+  updatedAt: string | null;
+  lastSalePriceSol: number | null;
+  lastSalePriceUsd: number | null;
+  lastSaleAt: string | null;
+  lastSaleMarketplace: string | null;
+};
+
+const CATEGORY_OPTIONS = [
+  ["all", "All categories"],
+  ["pokemon", "Pokémon"],
+  ["one_piece", "One Piece"],
+  ["basketball", "Basketball"],
+  ["football", "Football"],
+  ["hockey", "Hockey"],
+  ["baseball", "Baseball"],
+  ["soccer", "Soccer"],
+  ["yugioh", "Yu-Gi-Oh"],
+  ["dragon_ball", "Dragon Ball"],
+  ["magic_the_gathering", "Magic The Gathering"],
+  ["unknown", "Unknown"],
+] as const;
+
+const ASSET_TYPE_OPTIONS = [
+  ["all", "All asset types"],
+  ["card", "Cards"],
+  ["sealed", "Sealed"],
+  ["comic", "Comics"],
+  ["merch", "Merch"],
+  ["unknown", "Unknown"],
+] as const;
+
+const SOURCE_COLLECTION_OPTIONS = [
+  ["all", "All sources"],
+  ["collector_crypt", "Collector Crypt"],
+  ["phygitals", "Phygitals"],
+] as const;
+
+function sourceCollectionLabel(value: string | null | undefined) {
+  if (!value) return "collection unknown";
+  if (value === "CCryptWBYktukHDQ2vHGtVcmtjXxYzvw8XNVY64YN2Yf") return "Collector Crypt";
+  if (value === "BSG6DyEihFFtfvxtL9mKYsvTwiZXB1rq5gARMTJC2xAM") return "Phygitals";
+  if (value === "phygZDQZJZVHvJGYPGoKPYUtXw7mstSYtTtcuh8LJcC") return "Phygitals";
+  return short(value);
+}
+
+function short(value: string | null | undefined) {
+  if (!value) return "unknown";
+  return value.length > 14 ? `${value.slice(0, 6)}...${value.slice(-4)}` : value;
+}
+
+function categoryLabel(category: string) {
+  return CATEGORY_OPTIONS.find(([value]) => value === category)?.[1] ?? category;
+}
+
+function assetTypeLabel(assetType: string) {
+  return ASSET_TYPE_OPTIONS.find(([value]) => value === assetType)?.[1] ?? assetType;
+}
+
+function fmtSol(value: number | null) {
+  return typeof value === "number" ? `${value.toLocaleString("en-US", { maximumFractionDigits: 4 })} SOL` : null;
+}
+
+function fmtUsd(value: number | null) {
+  return typeof value === "number" ? `$${value.toLocaleString("en-US", { maximumFractionDigits: 2 })}` : null;
+}
+
+function NftImage({ src, name }: { src: string | null; name: string | null }) {
+  const [failed, setFailed] = useState(false);
+
+  if (!src || failed) {
+    return (
+      <div className="h-10 w-10 rounded-md bg-muted flex items-center justify-center text-[10px] text-muted-foreground">
+        NFT
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt={name ?? ""}
+      onError={() => setFailed(true)}
+      className="h-10 w-10 rounded-md object-cover bg-muted"
+    />
+  );
+}
+
+export function NftListPage() {
+  const [nfts, setNfts] = useState<NftAsset[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [limit] = useState(50);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const [category, setCategory] = useState("all");
+  const [assetType, setAssetType] = useState("all");
+  const [sourceCollection, setSourceCollection] = useState("");
+  const [search, setSearch] = useState("");
+  const [sort, setSort] = useState("name_asc");
+  const [includeOther, setIncludeOther] = useState(false);
+  const [includeUnknown, setIncludeUnknown] = useState(false);
+  const [missingImage, setMissingImage] = useState(false);
+
+  useEffect(() => {
+    setPage(1);
+  }, [category, assetType, sourceCollection, search, sort, includeOther, includeUnknown, missingImage]);
+
+  const query = useMemo(() => {
+    const params = new URLSearchParams({
+      page: String(page),
+      limit: String(limit),
+      sort,
+      includeOther: String(includeOther),
+      includeUnknown: String(includeUnknown),
+      includeStaging: "false",
+      missingImage: String(missingImage),
+    });
+
+    if (category !== "all") params.set("category", category);
+    if (assetType !== "all") params.set("assetType", assetType);
+    if (sourceCollection.trim()) params.set("sourceCollection", sourceCollection.trim());
+    if (search.trim()) params.set("search", search.trim());
+
+    return params.toString();
+  }, [assetType, category, includeOther, includeUnknown, limit, missingImage, page, search, sort, sourceCollection]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    async function load() {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const response = await fetch(`/api/nft-list?${query}`, {
+          signal: controller.signal,
+          headers: { accept: "application/json" },
+        });
+
+        const payload = await response.json() as { nfts?: NftAsset[]; total?: number; error?: string };
+        if (!response.ok) throw new Error(payload.error ?? "Unable to load NFT list");
+
+        setNfts(payload.nfts ?? []);
+        setTotal(payload.total ?? 0);
+      } catch (err) {
+        if (err instanceof Error && err.name === "AbortError") return;
+        setError(err instanceof Error ? err.message : "Unable to load NFT list");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    void load();
+    return () => controller.abort();
+  }, [query]);
+
+  const resultStart = total === 0 ? 0 : (page - 1) * limit + 1;
+  const resultEnd = Math.min(page * limit, total);
+  const hasNext = resultEnd < total;
+  const hasPrevious = page > 1;
+
+  const visibleCards = nfts.filter((nft) => nft.assetType === "card").length;
+  const otherAssets = nfts.filter((nft) => nft.assetType !== "card").length;
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">NFT List</h1>
+        <p className="text-sm text-muted-foreground mt-1">Browse ingested Collector Crypt / Phygitals NFTs.</p>
+      </div>
+
+      <div className="grid sm:grid-cols-3 gap-4">
+        <Stat label="NFTs matching filters" value={loading ? "..." : total.toLocaleString("en-US")} />
+        <Stat label="Cards on page" value={loading ? "..." : visibleCards.toString()} />
+        <Stat label="Other on page" value={loading ? "..." : otherAssets.toString()} />
+      </div>
+
+      <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+        <div className="grid md:grid-cols-4 gap-3">
+          <input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search name, mint, owner, collection"
+            className="h-10 rounded-md border border-border bg-surface px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+          />
+
+          <select value={category} onChange={(event) => setCategory(event.target.value)} className="h-10 rounded-md border border-border bg-surface px-3 text-sm">
+            {CATEGORY_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          </select>
+
+          <select value={assetType} onChange={(event) => setAssetType(event.target.value)} className="h-10 rounded-md border border-border bg-surface px-3 text-sm">
+            {ASSET_TYPE_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          </select>
+
+          <select value={sort} onChange={(event) => setSort(event.target.value)} className="h-10 rounded-md border border-border bg-surface px-3 text-sm">
+            <option value="name_asc">Name A to Z</option>
+            <option value="name_desc">Name Z to A</option>
+            <option value="updated_desc">Recently updated</option>
+            <option value="category_asc">Category A to Z</option>
+          </select>
+        </div>
+
+        <div className="grid md:grid-cols-4 gap-3">
+        <select
+            value={sourceCollection || "all"}
+            onChange={(event) => setSourceCollection(event.target.value === "all" ? "" : event.target.value)}
+            className="h-10 rounded-md border border-border bg-surface px-3 text-sm"
+            >
+            {SOURCE_COLLECTION_OPTIONS.map(([value, label]) => (
+            <option key={value} value={value}>{label}</option>))}
+        </select>
+
+          <label className="h-10 rounded-md border border-border bg-surface px-3 text-sm flex items-center justify-between gap-3 text-muted-foreground">
+            <span>Include other</span>
+            <input type="checkbox" checked={includeOther} onChange={(event) => setIncludeOther(event.target.checked)} className="h-4 w-4 accent-primary" />
+          </label>
+
+          <label className="h-10 rounded-md border border-border bg-surface px-3 text-sm flex items-center justify-between gap-3 text-muted-foreground">
+            <span>Include unknown</span>
+            <input type="checkbox" checked={includeUnknown} onChange={(event) => setIncludeUnknown(event.target.checked)} className="h-4 w-4 accent-primary" />
+          </label>
+
+          <label className="h-10 rounded-md border border-border bg-surface px-3 text-sm flex items-center justify-between gap-3 text-muted-foreground">
+            <span>Missing image only</span>
+            <input type="checkbox" checked={missingImage} onChange={(event) => setMissingImage(event.target.checked)} className="h-4 w-4 accent-primary" />
+          </label>
+        </div>
+      </div>
+
+      {error && <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">{error}</div>}
+
+      <div className="rounded-lg border border-border bg-card overflow-hidden">
+        <div className="border-b border-border px-5 py-3 text-sm text-muted-foreground flex items-center justify-between gap-3">
+          <span>{loading ? "Loading results..." : `Showing ${resultStart}-${resultEnd} of ${total.toLocaleString("en-US")} NFTs`}</span>
+          {!includeOther && !includeUnknown && <span className="text-xs">Cards only · other assets hidden</span>}
+        </div>
+
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border">
+              <th className="text-left font-medium px-5 py-3">NFT</th>
+              <th className="text-left font-medium px-5 py-3">Category</th>
+              <th className="text-left font-medium px-5 py-3">Asset type</th>
+              <th className="text-left font-medium px-5 py-3">Source collection</th>
+              <th className="text-left font-medium px-5 py-3">Owner</th>
+              <th className="text-left font-medium px-5 py-3">Last sale</th>
+              <th className="text-right font-medium px-5 py-3">Updated</th>
+            </tr>
+          </thead>
+
+          <tbody className="divide-y divide-border">
+            {loading ? (
+              <tr><td colSpan={7} className="px-5 py-8 text-sm text-muted-foreground">Loading NFTs...</td></tr>
+            ) : nfts.length === 0 ? (
+              <tr><td colSpan={7} className="px-5 py-8 text-sm text-muted-foreground">No NFTs match these filters.</td></tr>
+            ) : nfts.map((nft) => {
+              const lastSale = fmtSol(nft.lastSalePriceSol) ?? fmtUsd(nft.lastSalePriceUsd);
+              return (
+                <tr key={nft.mint} className="hover:bg-surface-raised/40 transition">
+                  <td className="px-5 py-3 min-w-[300px]">
+                    <div className="flex items-center gap-3">
+                      <NftImage src={nft.image} name={nft.name} />
+                      <div className="min-w-0">
+                        <div className="font-medium truncate">{nft.name ?? "Unnamed NFT"}</div>
+                        <div className="text-[11px] text-muted-foreground font-mono truncate">{sourceCollectionLabel(nft.sourceCollection)}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-5 py-3 text-center text-muted-foreground">
+                    <div className="flex items-center justify-center gap-2">
+                      {categoryIcon(nft.category) && <img src={categoryIcon(nft.category) ?? ""} alt="" className="h-5 w-5 rounded-sm object-contain" />}
+                      <span>{categoryLabel(nft.category)}</span>
+                    </div>
+                  </td>                  
+                  <td className="px-5 py-3">
+                    <span className="rounded border border-border bg-surface px-2 py-1 text-xs text-muted-foreground">
+                      {assetTypeLabel(nft.assetType)}
+                    </span>
+                  </td>
+                    <td className="px-5 py-3 text-xs text-muted-foreground">
+                        <div>{sourceCollectionLabel(nft.sourceCollection)}</div>
+                    </td>
+                    <td className="px-5 py-3 font-mono text-xs text-muted-foreground">{short(nft.owner)}</td>
+                  <td className="px-5 py-3 text-xs text-muted-foreground">
+                    {lastSale ? (
+                      <div>
+                        <div className="font-mono">{lastSale}</div>
+                        {nft.lastSaleAt && <div><RelativeTime iso={nft.lastSaleAt} /></div>}
+                      </div>
+                    ) : (
+                      "No sale yet"
+                    )}
+                  </td>
+                  <td className="px-5 py-3 text-right text-xs text-muted-foreground">
+                    {nft.updatedAt ? <RelativeTime iso={nft.updatedAt} /> : "unknown"}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+
+        <div className="border-t border-border px-5 py-3 flex items-center justify-between gap-3 text-sm text-muted-foreground">
+          <button
+            type="button"
+            disabled={!hasPrevious || loading}
+            onClick={() => setPage((value) => Math.max(value - 1, 1))}
+            className="rounded-md border border-border bg-surface px-3 py-1.5 disabled:opacity-40"
+          >
+            Previous
+          </button>
+
+          <span>Page {page}</span>
+
+          <button
+            type="button"
+            disabled={!hasNext || loading}
+            onClick={() => setPage((value) => value + 1)}
+            className="rounded-md border border-border bg-surface px-3 py-1.5 disabled:opacity-40"
+          >
+            Next
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-border bg-card p-5">
+      <div className="text-xs text-muted-foreground">{label}</div>
+      <div className="mt-1.5 text-2xl font-semibold font-mono tabular-nums">{value}</div>
+    </div>
+  );
+}

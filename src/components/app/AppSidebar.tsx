@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { LayoutDashboard, Layers, Activity } from "lucide-react";
+import { LayoutDashboard, Layers, Activity, List } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -17,6 +17,7 @@ const nav = [
   { title: "Market Overview", url: "/dashboard", icon: LayoutDashboard },
   { title: "Markets", url: "/collections", icon: Layers },
   { title: "Verified Sales", url: "/verified-sales", icon: Activity },
+  { title: "NFT List", url: "/nft-list", icon: List },
 ];
 
 export function AppSidebar() {
