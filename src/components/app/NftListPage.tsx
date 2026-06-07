@@ -263,9 +263,9 @@ export function NftListPage() {
             <tr className="text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border">
               <th className="w-[120px] text-center font-medium px-5 py-3">Category</th>
               <th className="text-left font-medium px-5 py-3">NFT</th>
-              <th className="text-left font-medium px-5 py-3">Asset type</th>
+              <th className="text-center font-medium px-5 py-3">Asset Type</th>
               <th className="w-[90px] text-center font-medium px-5 py-3">Source</th>
-              <th className="text-left font-medium px-5 py-3">Owner</th>
+              <th className="text-center font-medium px-5 py-3">Owner</th>
               <th className="text-left font-medium px-5 py-3">Last sale</th>
               <th className="text-right font-medium px-5 py-3">Updated</th>
             </tr>
@@ -295,15 +295,14 @@ export function NftListPage() {
                       <NftImage src={nft.image} name={nft.name} />
                       <div className="min-w-0">
                         <div className="font-medium truncate">{nft.name ?? "Unnamed NFT"}</div>
-                        <div className="text-[11px] text-muted-foreground truncate">NFT asset</div>
                       </div>
                     </div>
                   </td>
-                  <td className="px-5 py-3">
+                  <td className="px-5 py-3 text-center">
                     <span className="rounded border border-border bg-surface px-2 py-1 text-xs text-muted-foreground">
                       {assetTypeLabel(nft.assetType)}
                     </span>
-                  </td>  
+                  </td>
                   <td className="w-[90px] px-5 py-3 text-center text-xs text-muted-foreground">
                     <div className="flex w-full items-center justify-center">
                       {sourceCollectionLogo(nft.sourceCollection) ? (
@@ -318,7 +317,9 @@ export function NftListPage() {
                       )}
                     </div>
                   </td>
-                    <td className="px-5 py-3 font-mono text-xs text-muted-foreground">{short(nft.owner)}</td>
+                    <td className="px-5 py-3 text-center font-mono text-xs text-muted-foreground">
+                      {nft.owner ? nft.owner.slice(0, 4) : "unknown"}
+                    </td>
                   <td className="px-5 py-3 text-xs text-muted-foreground">
                     {lastSale ? (
                       <div>
