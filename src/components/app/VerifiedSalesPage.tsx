@@ -306,8 +306,8 @@ export function VerifiedSalesPage() {
         <table className="w-full text-sm">
           <thead>
             <tr className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground border-b border-border">
+              <th className="text-center font-medium px-5 py-3">Category</th>              
               <th className="text-left font-medium px-5 py-3">NFT</th>
-              <th className="text-center font-medium px-5 py-3">Category</th>
               <th className="text-right font-medium px-5 py-3">Price</th>
               <th className="text-right font-medium px-5 py-3">USD</th>
               <th className="text-center font-medium px-5 py-3">Growth</th>
@@ -326,6 +326,15 @@ export function VerifiedSalesPage() {
               const growth = priceGrowth(sale);
               return (
                 <tr key={sale.id} className="hover:bg-surface-raised/40 transition">
+                  <td className="px-5 py-3 text-center text-muted-foreground">
+                    <div className="flex items-center justify-center">
+                      {categoryIcon(sale.category) ? (
+                        <img src={categoryIcon(sale.category) ?? ""} alt={categoryLabel(sale.category)} title={categoryLabel(sale.category)} className="h-6 w-6 rounded-sm object-contain" />
+                      ) : (
+                        <span className="text-xs">{categoryLabel(sale.category)}</span>
+                      )}
+                    </div>
+                  </td>
                   <td className="px-5 py-3 min-w-[260px]">
                     <div className="flex items-center gap-3">
                       <NftImage src={sale.image} name={sale.name} />
@@ -333,12 +342,6 @@ export function VerifiedSalesPage() {
                         <div className="font-medium truncate">{sale.name ?? "Unnamed NFT"}</div>
                         <div className="text-[11px] text-muted-foreground truncate">{collectionLabel(sale.collection)}</div>
                       </div>
-                    </div>
-                  </td>
-                  <td className="px-5 py-3 text-center text-muted-foreground">
-                    <div className="flex items-center justify-center gap-2">
-                      {categoryIcon(sale.category) && <img src={categoryIcon(sale.category) ?? ""} alt="" className="h-5 w-5 rounded-sm object-contain" />}
-                      <span>{categoryLabel(sale.category)}</span>
                     </div>
                   </td>
                     <td className="px-5 py-3 text-right font-mono font-semibold tabular-nums">{primaryPrice(sale)}</td>

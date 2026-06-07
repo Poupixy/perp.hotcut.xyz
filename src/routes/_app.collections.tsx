@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { realMarketCategories, fmtCount } from "@/lib/real-market-data";
+import { categoryIcon } from "@/components/app/categoryIcons";
 
 export const Route = createFileRoute("/_app/collections")({
   component: CollectionsPage,
@@ -38,7 +39,8 @@ function CollectionsPage() {
                 <td className="px-5 py-3.5 text-muted-foreground font-mono text-xs">{i + 1}</td>
                 <td className="px-5 py-3.5">
                   <Link to="/collections/$slug" params={{ slug: c.slug }} className="flex items-center gap-3">
-                    <div className="h-9 w-9 rounded-md bg-primary/10 ring-1 ring-primary/20" />
+                    {categoryIcon(c.slug) ? (
+                      <img src={categoryIcon(c.slug) ?? ""} alt="" className="h-9 w-9 rounded-md object-contain bg-primary/10 ring-1 ring-primary/20 p-1" />) : (<div className="h-9 w-9 rounded-md bg-primary/10 ring-1 ring-primary/20" />)}
                     <div>
                       <div className="font-medium group-hover:text-primary transition">{c.name}</div>
                       <div className="text-xs text-muted-foreground">Collector Crypt + Phygitals</div>

@@ -58,6 +58,13 @@ function sourceCollectionLabel(value: string | null | undefined) {
   return short(value);
 }
 
+function sourceCollectionLogo(value: string | null | undefined) {
+  if (value === "CCryptWBYktukHDQ2vHGtVcmtjXxYzvw8XNVY64YN2Yf") return "/collectorcrypt.png";
+  if (value === "BSG6DyEihFFtfvxtL9mKYsvTwiZXB1rq5gARMTJC2xAM") return "/phygitals.png";
+  if (value === "phygZDQZJZVHvJGYPGoKPYUtXw7mstSYtTtcuh8LJcC") return "/phygitals.png";
+  return null;
+}
+
 function short(value: string | null | undefined) {
   if (!value) return "unknown";
   return value.length > 14 ? `${value.slice(0, 6)}...${value.slice(-4)}` : value;
@@ -254,10 +261,10 @@ export function NftListPage() {
         <table className="w-full text-sm">
           <thead>
             <tr className="text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border">
+              <th className="w-[120px] text-center font-medium px-5 py-3">Category</th>
               <th className="text-left font-medium px-5 py-3">NFT</th>
-              <th className="text-left font-medium px-5 py-3">Category</th>
               <th className="text-left font-medium px-5 py-3">Asset type</th>
-              <th className="text-left font-medium px-5 py-3">Source collection</th>
+              <th className="w-[90px] text-center font-medium px-5 py-3">Source</th>
               <th className="text-left font-medium px-5 py-3">Owner</th>
               <th className="text-left font-medium px-5 py-3">Last sale</th>
               <th className="text-right font-medium px-5 py-3">Updated</th>
@@ -272,30 +279,45 @@ export function NftListPage() {
             ) : nfts.map((nft) => {
               const lastSale = fmtSol(nft.lastSalePriceSol) ?? fmtUsd(nft.lastSalePriceUsd);
               return (
+                
                 <tr key={nft.mint} className="hover:bg-surface-raised/40 transition">
+                  <td className="w-[120px] px-5 py-3 text-center text-muted-foreground">
+                    <div className="flex w-full items-center justify-center">
+                      {categoryIcon(nft.category) ? (
+                        <img src={categoryIcon(nft.category) ?? ""} alt={categoryLabel(nft.category)} title={categoryLabel(nft.category)} className="h-6 w-6 rounded-sm object-contain" />
+                      ) : (
+                        <span className="text-xs">{categoryLabel(nft.category)}</span>
+                      )}
+                    </div>
+                  </td> 
                   <td className="px-5 py-3 min-w-[300px]">
                     <div className="flex items-center gap-3">
                       <NftImage src={nft.image} name={nft.name} />
                       <div className="min-w-0">
                         <div className="font-medium truncate">{nft.name ?? "Unnamed NFT"}</div>
-                        <div className="text-[11px] text-muted-foreground font-mono truncate">{sourceCollectionLabel(nft.sourceCollection)}</div>
+                        <div className="text-[11px] text-muted-foreground truncate">NFT asset</div>
                       </div>
                     </div>
                   </td>
-                  <td className="px-5 py-3 text-center text-muted-foreground">
-                    <div className="flex items-center justify-center gap-2">
-                      {categoryIcon(nft.category) && <img src={categoryIcon(nft.category) ?? ""} alt="" className="h-5 w-5 rounded-sm object-contain" />}
-                      <span>{categoryLabel(nft.category)}</span>
-                    </div>
-                  </td>                  
                   <td className="px-5 py-3">
                     <span className="rounded border border-border bg-surface px-2 py-1 text-xs text-muted-foreground">
                       {assetTypeLabel(nft.assetType)}
                     </span>
+                  </td>  
+                  <td className="w-[90px] px-5 py-3 text-center text-xs text-muted-foreground">
+                    <div className="flex w-full items-center justify-center">
+                      {sourceCollectionLogo(nft.sourceCollection) ? (
+                        <img
+                          src={sourceCollectionLogo(nft.sourceCollection) ?? ""}
+                          alt={sourceCollectionLabel(nft.sourceCollection)}
+                          title={sourceCollectionLabel(nft.sourceCollection)}
+                          className="h-6 w-6 rounded-sm object-contain"
+                        />
+                      ) : (
+                        <span>{sourceCollectionLabel(nft.sourceCollection)}</span>
+                      )}
+                    </div>
                   </td>
-                    <td className="px-5 py-3 text-xs text-muted-foreground">
-                        <div>{sourceCollectionLabel(nft.sourceCollection)}</div>
-                    </td>
                     <td className="px-5 py-3 font-mono text-xs text-muted-foreground">{short(nft.owner)}</td>
                   <td className="px-5 py-3 text-xs text-muted-foreground">
                     {lastSale ? (
